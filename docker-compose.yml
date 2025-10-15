@@ -1,0 +1,91 @@
+services:
+  streaming-api:
+    image: ${STREAMING_API_IMAGE}
+    ports:
+      - "8080:8080"
+    environment:
+      - AAI_WSS_PORT=8080
+      - AAI_ASR_ENDPOINT=streaming-asr-lb:80
+      - AAI_STREAMING_ASR_ENDPOINT=streaming-asr-lb:80
+      - AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=False
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v3/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 5s
+    depends_on:
+      - streaming-asr-lb
+    networks:
+      - streaming-network
+
+  streaming-asr-lb:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:80/nginx_health" ]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 10s
+    volumes:
+      - ./nginx_streaming_asr.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - streaming-asr-english
+      - streaming-asr-multilang
+    networks:
+      - streaming-network
+
+  streaming-asr-english:
+    image: ${STREAMING_ASR_ENGLISH_IMAGE}
+    ports:
+      - "50051:50051"
+    environment:
+      - SERVER_PORT=50051
+      - LOGGING_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 120s
+    networks:
+      - streaming-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ "gpu" ]
+
+  streaming-asr-multilang:
+    image: ${STREAMING_ASR_MULTILANG_IMAGE}
+    ports:
+      - "50052:50051"
+    environment:
+      - SERVER_PORT=50051
+      - LOGGING_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 120s
+    networks:
+      - streaming-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ "gpu" ]
+
+networks:
+  streaming-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
