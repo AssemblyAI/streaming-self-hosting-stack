@@ -1,7 +1,7 @@
 # Streaming Self-Hosted Services Docker Compose
 
 This Docker Compose configuration runs the AssemblyAI streaming services as a standalone self-hosted stack.
-
+Test.
 ## Services Included
 - **streaming-api**: Gateway API service handling WebSocket connections
 - **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing
