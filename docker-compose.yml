@@ -5,9 +5,12 @@ services:
       - "8080:8080"
     environment:
       - AAI_WSS_PORT=8080
+      - AAI_LOG_LEVEL=INFO
+      - AAI_USE_STRUCTURED_LOGGING=False
       - AAI_ASR_ENDPOINT=streaming-asr-lb:80
       - AAI_STREAMING_ASR_ENDPOINT=streaming-asr-lb:80
       - AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=False
+      - AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=license-and-usage-proxy:8080
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v3/health"]
       interval: 10s
@@ -16,6 +19,7 @@ services:
       start_period: 5s
     depends_on:
       - streaming-asr-lb
+      - license-and-usage-proxy
     networks:
       - streaming-network
 
@@ -44,6 +48,7 @@ services:
     environment:
       - SERVER_PORT=50051
       - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
@@ -67,6 +72,7 @@ services:
     environment:
       - SERVER_PORT=50051
       - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
@@ -82,6 +88,26 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [ "gpu" ]
+
+  license-and-usage-proxy:
+    image: ${LICENSE_AND_USAGE_PROXY_IMAGE}
+    ports:
+      - "8082:8080"
+    environment:
+      - HTTP_PORT=8080
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      - LICENSE_FILE_PATH=/var/aai_license.jwt
+    volumes:
+      - ./license.jwt:/var/aai_license.jwt:ro
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 10s
+    networks:
+      - streaming-network
 
 networks:
   streaming-network:

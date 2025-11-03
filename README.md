@@ -3,24 +3,28 @@
 This Docker Compose configuration runs the AssemblyAI streaming services as a standalone self-hosted stack.
 
 ## Services Included
-- **streaming-api**: Gateway API service handling WebSocket connections
-- **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing
-- **streaming-asr-english**: English ASR model service (requires GPU)
-- **streaming-asr-multilang**: Multilingual ASR model service (requires GPU)
+- **streaming-api**: Gateway API service handling WebSocket connections.
+- **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
+- **streaming-asr-english**: English ASR model service (requires GPU).
+- **streaming-asr-multilang**: Multilingual ASR model service (requires GPU).
+- **license-and-usage-proxy**: License validation service. Usage tracking will be added in upcoming releases.
 
 ## Connection Flow
-
 ```
-External Request → streaming-api:8080 (WebSocket) → streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                        ├── en-default → streaming-asr-english:50051 (gRPC)
-                                                                        └── ml-default → streaming-asr-multilang:50051 (gRPC)
+Websocket client → streaming-api:8080 (WebSocket)
+                          │
+                          ├─ License validation ─→ license-and-usage-proxy:8080 (HTTP)
+                          │
+                          └─ ASR requests ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
+                                                                                ├── en-default → streaming-asr-english:50051 (gRPC)
+                                                                                └── ml-default → streaming-asr-multilang:50051 (gRPC)
 ```
 
 ## Prerequisites
-
-1. **Docker & Docker Compose**: Ensure Docker and Docker Compose are installed
-2. **GPU Support**: NVIDIA Container Toolkit for GPU-enabled services
-3. **AWS Access**: Valid AWS credentials to pull images from ECR
+1. **AssemblyAI license**: Valid for the streaming self-hosted product.
+2. **Docker & Docker Compose**: Ensure Docker and Docker Compose are installed.
+3. **GPU Support**: NVIDIA Container Toolkit for GPU-enabled services.
+4. **AWS Access**: Valid AWS credentials to pull images from ECR.
 
 ## Setup Instructions
 
@@ -55,9 +59,14 @@ Use the reference `.env.example` file to create a `.env` file with container ima
 STREAMING_API_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
+LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
 ```
 
-### 4. Start Services
+### 4. Have the license file ready
+
+Ensure you have your AssemblyAI license file in the current working directory as `license.jwt`, or modify the `LICENSE_FILE_PATH` environment variable in the `docker-compose.yml` to point to your license file location.
+
+### 5. Start Services
 
 ```bash
 # Start all services
@@ -128,8 +137,8 @@ python example_with_prerecorded_audio_file.py --help
 
 ### Nginx Configuration
 **ASR Load Balancer** (`nginx_streaming_asr.conf`):
-- gRPC proxying to ASR services
-- Routes to English or Multilang model based on the `X-Model-Version` header value
+- gRPC proxying to ASR services.
+- Routes to English or Multilang model based on the `X-Model-Version` header value.
 
 ## Monitoring & Debugging
 
@@ -164,3 +173,61 @@ docker compose restart streaming-api
 docker compose restart streaming-asr-english
 docker compose restart streaming-asr-multilang
 ```
+
+## Production Deployment Recommendations
+
+### streaming-api service
+
+- **Deployment Strategy**: We recommend doing Blue/Green deployments to avoid disrupting ongoing sessions. Once you fully shift the traffic to the new color, wait at least 3 hours (the max session duration) before shutting down the old color to ensure no sessions get disrupted.
+- **Resource Allocation**: We recommend allocating 1 CPU per container with at least 2GB of RAM for better hardware utilization. For example, it's better to have 4 containers with 1 CPU and 2GB RAM each rather than 1 container with 4 CPU and 8GB RAM.
+- **Autoscaling**: We recommend setting up autoscaling based on the number of active sessions. A container with 1 CPU can generally handle around 32 concurrent sessions.
+- **Monitoring**: Always monitor the logs during deployment to catch any potential issues early.
+- **Dependencies**: For successful startup, the service depends on the license-and-usage-proxy service being up and running.
+- **Configuration**: You can enable features like TLS encryption and structured logging via environment variables.
+- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+
+### license-and-usage-proxy service
+
+- **Deployment Strategy**: Do gradual rollouts to ensure stability.
+- **Resource Allocation**: We recommend allocating 1 CPU per container with at least 2GB of RAM for better hardware utilization. For example, it's better to have 4 containers with 1 CPU and 2GB RAM each rather than 1 container with 4 CPU and 8GB RAM.
+- **Monitoring**: Always monitor logs during deployment to catch any potential issues early. You can set up an alert based on the responses of the `/v1/status` endpoint to alert you on any license issues.
+- **Dependencies**: For successful startup, the service depends on having a valid license being mounted on the container filesystem. To mount it, set the `LICENSE_FILE_PATH` environment variable to point to the license file path on the host machine.
+- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+
+#### License Status Endpoint
+
+The `/v1/status` endpoint provides real-time information about the license validation state:
+
+**Endpoint**: `GET /v1/status`
+
+**Response Schema**:
+```json
+{
+  "state": "Ready | Connected | TrustBased | Failed",
+  "last_successful_checkin": "2025-01-01T12:00:00.000000Z",
+  "trust_expiration": "2025-01-05T12:00:00.000000Z"
+}
+```
+
+**State Descriptions**:
+- `Ready`: Initial state when the service starts before any license validation has occurred.
+- `Connected`: Last license validation check was successful.
+- `TrustBased`: Last license validation check failed, but the request was within the trust window grace period, so services will remain operational.
+- `Failed`: Last license validation check failed and the trust window has expired. streaming-api containers will shut down and stop serving requests.
+
+**Fields**:
+- `state`: Current license validation state.
+- `last_successful_checkin`: ISO 8601 timestamp of the last successful license validation (null if never successful).
+- `trust_expiration`: ISO 8601 timestamp when the trust window expires (null if no successful validation yet).
+
+**Recommended Alerts**:
+- Alert when `state` transitions to `TrustBased` (indicates license validation issues).
+- Critical alert when `state` is `Failed` (services will shut down).
+
+### streaming-asr-english and streaming-asr-multilang services
+
+- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr container if a persistent connection gets disrupted with minimal state loss.
+- **Hardware Requirements**: The services can run on NVIDIA T4 or newer GPUs. We recommend allocating at least 4 CPU and 16GB of RAM per container.
+- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container with recommended hardware can generally handle up to 28 concurrent sessions.
+- **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
+- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
