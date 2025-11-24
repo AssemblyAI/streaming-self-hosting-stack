@@ -7,15 +7,17 @@ This Docker Compose configuration runs the AssemblyAI streaming services as a st
 - **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
 - **streaming-asr-english**: English ASR model service (requires GPU).
 - **streaming-asr-multilang**: Multilingual ASR model service (requires GPU).
-- **license-and-usage-proxy**: License validation service. Usage tracking will be added in upcoming releases.
+- **license-and-usage-proxy**: License validation and usage reporting service.
 
 ## Connection Flow
 ```
 Websocket client → streaming-api:8080 (WebSocket)
                           │
-                          ├─ License validation ─→ license-and-usage-proxy:8080 (HTTP)
+                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
+                          │                               │
+                          ├─ License validation  ─────────┘
                           │
-                          └─ ASR requests ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
+                          └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
                                                                                 ├── en-default → streaming-asr-english:50051 (gRPC)
                                                                                 └── ml-default → streaming-asr-multilang:50051 (gRPC)
 ```
@@ -140,6 +142,36 @@ python example_with_prerecorded_audio_file.py --help
 - gRPC proxying to ASR services.
 - Routes to English or Multilang model based on the `X-Model-Version` header value.
 
+### Usage Reporting Configuration
+
+The license-and-usage-proxy service supports two billing modes based on your AssemblyAI license:
+
+#### Flat Billing Mode
+If your license is configured for flat billing, usage tracking is disabled. No additional configuration is required.
+
+#### Usage-Based Billing Mode
+If your license is configured for usage-based billing, the proxy will automatically report usage data to AssemblyAI's usage tracker service. You must configure the following environment variable in the `docker-compose.yml` for the `license-and-usage-proxy` service:
+
+```yaml
+environment:
+  - USAGE_TRACKING_API_KEY=<your-api-key>
+```
+
+**Important Notes:**
+- For the API key, any key retrieved from the AssemblyAI dashboard can be used.
+- At startup, the proxy validates connectivity by registering with AssemblyAI's https://usage-tracker.assemblyai.com.
+- If connectivity validation fails, the proxy will shut down.
+- Usage data is batched and reported every few seconds.
+- The proxy automatically retries failed requests up to several times.
+
+**Critical Behavior:**
+If https://usage-tracker.assemblyai.com becomes unreachable and all retry attempts fail (after 5-60 minutes), the license-and-usage-proxy service will terminate itself. This is a fail-safe mechanism to ensure usage data integrity. Your service orchestrator should be configured to automatically replace the container with a new one.
+
+**Monitoring Recommendations:**
+- Monitor the proxy's logs for warnings about failed usage reporting attempts.
+- Set up alerts for proxy restarts, which may indicate persistent connectivity issues.
+- If the in-memory usage queue size exceeds 1000 items, the proxy will log a warning suggesting upscaling.
+
 ## Monitoring & Debugging
 
 ### View Service Logs
@@ -185,14 +217,20 @@ docker compose restart streaming-asr-multilang
 - **Dependencies**: For successful startup, the service depends on the license-and-usage-proxy service being up and running.
 - **Configuration**: You can enable features like TLS encryption and structured logging via environment variables.
 - **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+- **Usage Reporting Behavior**: After each session completes, the streaming-api reports usage to the license-and-usage-proxy with automatic retries on failure. Monitor logs any messages at a >= warning level.
 
 ### license-and-usage-proxy service
 
-- **Deployment Strategy**: Do gradual rollouts to ensure stability.
+- **Deployment Strategy**: Do gradual rollouts to ensure stability. Consider implementing monitoring and alerting for service restarts.
 - **Resource Allocation**: We recommend allocating 1 CPU per container with at least 2GB of RAM for better hardware utilization. For example, it's better to have 4 containers with 1 CPU and 2GB RAM each rather than 1 container with 4 CPU and 8GB RAM.
-- **Monitoring**: Always monitor logs during deployment to catch any potential issues early. You can set up an alert based on the responses of the `/v1/status` endpoint to alert you on any license issues.
-- **Dependencies**: For successful startup, the service depends on having a valid license being mounted on the container filesystem. To mount it, set the `LICENSE_FILE_PATH` environment variable to point to the license file path on the host machine.
+- **Monitoring**: Always monitor logs during deployment to catch any potential issues early. You can set up an alert based on the responses of the `/v1/status` endpoint to alert you on any license issues. For usage-based billing, also monitor for usage reporting warnings and service restarts.
+- **Dependencies**:
+  - For successful startup, the service depends on having a valid license being mounted on the container filesystem. To mount it, set the `LICENSE_FILE_PATH` environment variable to point to the license file path on the host machine.
+  - For usage-based billing, the service also requires connectivity to https://usage-tracker.assemblyai.com at startup. If connectivity validation fails, the container will terminate. Ensure the `USAGE_TRACKING_API_KEY` environment variable is properly configured.
 - **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+- **Usage Reporting Resilience**:
+  - Network connectivity to the https://usage-tracker.assemblyai.com endpoint must be reliable for production deployments with usage-based billing.
+  - Run at least a few containers behind a load balancer to ensure high availability.
 
 #### License Status Endpoint
 
