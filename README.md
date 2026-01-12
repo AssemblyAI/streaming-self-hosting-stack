@@ -269,3 +269,28 @@ The `/v1/status` endpoint provides real-time information about the license valid
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container with recommended hardware can generally handle up to 28 concurrent sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+
+## Changelog
+
+### v0.4.0
+
+#### English ASR Model
+
+Major improvements to short utterance handling and hallucination reduction:
+
+- **100% reduction in hallucinations**
+- **12.8% improvement on short utterances** - Better performance for voice agent use cases
+- **7.39% improvement on digit sequence error rate**
+- **1.75% improvement on proper nouns**
+- **0.46% improvement on CI segments**
+- **0.39% improvement on accented speech**
+
+#### Multilingual ASR Model
+
+- **Context biasing support** - Customers can now use context biasing (model-based biasing) with the multilingual model
+
+#### Other Improvements
+
+- Increased concurrent session handling per container, leading to reduced deployment costs
+- Improved observability for the license-and-usage-proxy service
+- Various bug fixes and stability improvements
