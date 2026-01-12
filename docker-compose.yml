@@ -48,6 +48,7 @@ services:
       - SERVER_PORT=50051
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
+      - MAX_OPEN_STREAMS=48
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
@@ -72,6 +73,7 @@ services:
       - SERVER_PORT=50051
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
+      - MAX_OPEN_STREAMS=48
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
