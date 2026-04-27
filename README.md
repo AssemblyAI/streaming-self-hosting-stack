@@ -119,7 +119,7 @@ python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.w
 python example_with_prerecorded_audio_file.py \
   --audio-file "example_audio_file.wav" \
   --endpoint "ws://localhost:8080" \
-  --language "multi"
+  --speech-model "universal-streaming-multilingual"
 ```
 
 **Command-line arguments:**
@@ -128,7 +128,7 @@ python example_with_prerecorded_audio_file.py \
 |----------|--------------------------------------------------------|--------------------------|
 | `--audio-file` | Path to the audio file to transcribe                   | `example_audio_file.wav` |
 | `--endpoint` | WebSocket endpoint URL                                 | `ws://localhost:8080`     |
-| `--language` | Language code for transcription (e.g., 'multi')        | ``                       |
+| `--speech-model` | Speech model to use (e.g., 'universal-streaming-multilingual') | ``               |
 
 **View help:**
 ```bash
@@ -271,6 +271,39 @@ The `/v1/status` endpoint provides real-time information about the license valid
 - **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
 
 ## Changelog
+
+### v0.5.0
+
+#### English ASR Model
+
+A new English model is released, which produces already-formatted outputs directly and delivers large quality gains on digits, telephony, medical, and CI segments:
+
+- **34% improvement on digit sequence error rate (DSER)**
+- **17% improvement on telephony WER**
+- **12% average improvement on medical WER**
+- **10% average improvement on CI segments WER**
+- **~2.4% absolute F1 score improvement on keyterms prompting**
+- **Significantly improved timestamp accuracy** — resolves overlapping and zero-duration word issues
+
+#### Multilingual ASR Model
+
+- **~70% absolute improvement in timestamp accuracy** — fixes overlapping words and zero-duration word bugs
+
+#### Streaming API — New Features
+
+- **Error and Warning WebSocket message types** — Dedicated message types that let clients distinguish actionable errors from non-fatal warnings without relying on close codes.
+- **Configuration echoed in SessionBegins** — The `SessionBegins` message now includes the resolved session configuration so clients can verify applied settings.
+- **Explicit speech-model selection** — Clients explicitly select the speech model at session start.
+
+#### Streaming API — Fixes and Improvements
+
+- **More specific WebSocket close codes** for session termination scenarios, making client-side error handling more precise.
+- **Improved `word_finalized` events** — All word finalizations are emitted (not only the last word of a turn).
+
+#### Other Improvements
+
+- Various logging, metrics, and observability improvements across the streaming-api and ASR services.
+- Bug fixes and stability improvements.
 
 ### v0.4.0
 

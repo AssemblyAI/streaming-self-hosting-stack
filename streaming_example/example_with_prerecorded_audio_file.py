@@ -165,7 +165,7 @@ def run_session(
     audio_chunks: List[AudioChunk],
     sample_rate: int,
     keyterms_prompt: Optional[List[str]] = None,
-    language: Optional[str] = None,
+    speech_model: Optional[str] = None,
 ) -> None:
     """
     Run a WebSocket session to stream audio and receive transcriptions.
@@ -174,16 +174,14 @@ def run_session(
     :param audio_chunks: List of audio chunks to send.
     :param sample_rate: Sample rate of the audio.
     :param keyterms_prompt: Optional list of key terms for the transcription.
-    :param language: Optional language code for transcription.
+    :param speech_model: Optional speech model to use for transcription.
     """
     try:
-        params = {
-            "sample_rate": sample_rate,
-        }
+        params = {"sample_rate": sample_rate, "format_turns": "true"}
         if keyterms_prompt:
             params["keyterms"] = json.dumps(keyterms_prompt)
-        if language:
-            params["language"] = language
+        if speech_model:
+            params["speech_model"] = speech_model
 
         endpoint_str = f"{api_endpoint}?{urlencode(params)}"
         headers = {"Authorization": "self-hosted"}
@@ -219,8 +217,8 @@ Examples:
   # Basic usage with default endpoint
   python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav
 
-  # Specify custom endpoint and language
-  python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav --endpoint ws://localhost:8080 --language multi
+  # Specify custom endpoint and speech model
+  python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav --endpoint ws://localhost:8080 --speech-model universal-streaming-multilingual
 
 Note: Audio file must be PCM 16-bit WAV format, mono channel, 16kHz sample rate.
         """,
@@ -238,10 +236,10 @@ Note: Audio file must be PCM 16-bit WAV format, mono channel, 16kHz sample rate.
         help="WebSocket endpoint URL (default: ws://localhost:8080)",
     )
     parser.add_argument(
-        "--language",
+        "--speech-model",
         type=str,
         default="",
-        help="Language code for transcription (e.g., 'multi')",
+        help="Speech model to use (e.g., 'universal-streaming-english', 'universal-streaming-multilingual')",
     )
     return parser.parse_args()
 
@@ -261,7 +259,7 @@ if __name__ == "__main__":
             api_endpoint=args.endpoint,
             audio_chunks=audio_chunks,
             sample_rate=sample_rate,
-            language=args.language if args.language else None,
+            speech_model=args.speech_model if args.speech_model else None,
         )
     except KeyboardInterrupt:
         LOGGER.info("Interrupted by user, exiting.")
