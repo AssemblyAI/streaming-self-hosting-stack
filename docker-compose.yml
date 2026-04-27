@@ -11,7 +11,7 @@ services:
       - AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=False
       - AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v3/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v3/ws/health"]
       interval: 10s
       timeout: 2s
       retries: 2
