@@ -2,14 +2,30 @@
 
 This Docker Compose configuration runs the AssemblyAI streaming services as a standalone self-hosted stack.
 
+## Choosing a stack
+
+Two compose files are shipped. Pick the one that matches the model you want to serve — they are mutually exclusive (run one at a time):
+
+| File | Models served | GPU requirement |
+|------|--------------|-----------------|
+| `docker-compose.yml` | Universal English + Multilingual streaming | NVIDIA T4+ per ASR container |
+| `docker-compose.u3pro.yml` | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+
+To switch between stacks, run `docker compose down` (or `docker compose -f docker-compose.u3pro.yml down`) before starting the other.
+
 ## Services Included
+Both stacks include:
 - **streaming-api**: Gateway API service handling WebSocket connections.
 - **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
-- **streaming-asr-english**: English ASR model service (requires GPU).
-- **streaming-asr-multilang**: Multilingual ASR model service (requires GPU).
 - **license-and-usage-proxy**: License validation and usage reporting service.
 
+ASR backends differ by stack:
+- Universal stack (`docker-compose.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
+- U3 Pro stack (`docker-compose.u3pro.yml`): `streaming-asr-u3pro`.
+
 ## Connection Flow
+
+**Universal stack** (`docker-compose.yml`):
 ```
 Websocket client → streaming-api:8080 (WebSocket)
                           │
@@ -21,6 +37,20 @@ Websocket client → streaming-api:8080 (WebSocket)
                                                                                 ├── en-default → streaming-asr-english:50051 (gRPC)
                                                                                 └── ml-default → streaming-asr-multilang:50051 (gRPC)
 ```
+
+**U3 Pro stack** (`docker-compose.u3pro.yml`):
+```
+Websocket client → streaming-api:8080 (WebSocket)
+                          │
+                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
+                          │                               │
+                          ├─ License validation  ─────────┘
+                          │
+                          └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
+                                                                                └── u3-pro → streaming-asr-u3pro:50051 (gRPC)
+```
+
+Both stacks share the same `nginx_streaming_asr.conf`, which routes by `X-Model-Version` header. Each stack only deploys the backends it needs — websocket clients should use a `speech_model` query parameter value that routes to an available backend.
 
 ## Prerequisites
 1. **AssemblyAI license**: Valid for the streaming self-hosted product.
@@ -57,30 +87,57 @@ aws ecr get-login-password --region us-west-2 | docker login --username AWS --pa
 
 Use the reference `.env.example` file to create a `.env` file with container image references:
 
+Set the image variables relevant to the stack you plan to run:
+
 ```bash
+# Required for both stacks:
 STREAMING_API_IMAGE=<CUSTOM_IMAGE>
+LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
+
+# Required for the universal stack (docker-compose.yml):
 STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
-LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
+
+# Required for the U3 Pro stack (docker-compose.u3pro.yml):
+STREAMING_ASR_U3PRO_IMAGE=<CUSTOM_IMAGE>
 ```
 
 ### 4. Have the license file ready
 
-Ensure you have your AssemblyAI license file in the current working directory as `license.jwt`, or modify the `LICENSE_FILE_PATH` environment variable in the `docker-compose.yml` to point to your license file location.
+Ensure you have your AssemblyAI license file in the current working directory as `license.jwt`, or modify the `LICENSE_FILE_PATH` environment variable in the relevant Docker Compose file to point to your license file location.
 
-### 5. Start Services
+### 5. Run Services
 
+Pick the stack you want to run. Both use the same `streaming-api`, load balancer, and license proxy — they differ only in the ASR backend.
+
+For the U3 Pro stack, websocket clients should set query parameter `speech_model` to "u3-rt-pro" so the load balancer routes to the U3 Pro backend.
+
+
+**Universal stack** (English + Multilingual):
 ```bash
-# Start all services
 docker compose up -d
 
-# View logs
 docker compose logs -f
 
 # Check service status
 docker compose ps
+
+# Stop services before switching stacks
+docker compose down
 ```
 
+**U3 Pro stack**:
+```bash
+docker compose -f docker-compose.u3pro.yml up -d
+
+docker compose -f docker-compose.u3pro.yml logs -f
+
+# Check service status
+docker compose ps
+
+# Stop services before switching stacks
+docker compose -f docker-compose.u3pro.yml down
+```
 ## Service Endpoints
 
 - **WebSocket**: `ws://localhost:8080`
@@ -89,7 +146,7 @@ docker compose ps
 
 A Python example script is provided to demonstrate how to stream audio to the self-hosted stack.
 
-_Note_: You can initiate a session as soon as the `streaming-asr-english` and `streaming-asr-multilang` related containers are healthy, which happens after they output a "Ready to serve!" log line.
+_Note_: You can initiate a session as soon as the relevant ASR container is healthy. `streaming-asr-english` and `streaming-asr-multilang` log "Ready to serve!" when ready (typically ~2 min). `streaming-asr-u3pro` logs "U3Pro ASR Server ready!" when ready (typically ~5 min).
 
 Change the current directory to the `streaming_example` directory:
 ``` bash
@@ -110,17 +167,18 @@ pip install -r requirements.txt
 The example script (`example_with_prerecorded_audio_file.py`) accepts several CLI arguments:
 
 **Basic usage:**
-```bash
-python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav"
-```
-
-**Example using all available options:**
-```bash
-python example_with_prerecorded_audio_file.py \
-  --audio-file "example_audio_file.wav" \
-  --endpoint "ws://localhost:8080" \
-  --speech-model "universal-streaming-multilingual"
-```
+- Universal stack English:
+    ```bash
+    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-english"
+    ```
+- Universal stack Multilingual:
+    ```bash
+    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-multilingual"
+    ```
+- U3 Pro stack:
+    ```bash
+    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "u3-rt-pro"
+    ```
 
 **Command-line arguments:**
 
@@ -173,16 +231,6 @@ If https://usage-tracker.assemblyai.com becomes unreachable and all retry attemp
 - If the in-memory usage queue size exceeds 1000 items, the proxy will log a warning suggesting upscaling.
 
 ## Monitoring & Debugging
-
-### View Service Logs
-```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker compose logs -f streaming-api
-```
-
 ### Check Service Status
 ```bash
 # Container status
@@ -200,10 +248,13 @@ docker stats
 # Check nginx configurations
 docker compose exec streaming-asr-lb nginx -t
 
-# Restart specific service
+# Restart specific service (universal stack)
 docker compose restart streaming-api
 docker compose restart streaming-asr-english
 docker compose restart streaming-asr-multilang
+
+# Restart specific service (U3 Pro stack)
+docker compose -f docker-compose.u3pro.yml restart streaming-asr-u3pro
 ```
 
 ## Production Deployment Recommendations
@@ -268,9 +319,40 @@ The `/v1/status` endpoint provides real-time information about the license valid
 - **Hardware Requirements**: The services can run on NVIDIA T4 or newer GPUs. We recommend allocating at least 4 CPU and 16GB of RAM per container.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container with recommended hardware can generally handle up to 28 concurrent sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
-- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
+- **Health Checks**: Use the healthcheck command provided in the Docker Compose file to monitor container health.
+
+### streaming-asr-u3pro service
+- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr-u3-pro container if a persistent connection gets disrupted with minimal state loss.
+- **Hardware Requirements**: NVIDIA L4 / A10 / A100 / L40S / H100 or equivalent with at least 24 GB VRAM. The container also needs ~14 GB of disk for the bundled model weights.
+- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
+- **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
+- **Health Checks**: Use the healthcheck command provided in the Docker Compose file to monitor container health.
 
 ## Changelog
+
+### v0.6.0
+
+#### U3 Pro — New Self-Hosted Stack (NEW)
+
+This release introduces the **U3 Pro self-hosted stack** (`docker-compose.u3pro.yml`), which serves the U3 Pro async model. U3 Pro delivers significant improvements over the universal English model on complex entities, short utterances, and end-of-turn (EOT) latency, and is targeted at voice agent scenarios.
+
+Hardware: NVIDIA L4 / A10 / A100 / L40S / H100 (24 GB+ VRAM).
+
+Highlights of U3 Pro behavior delivered with this release:
+
+- **New transcription prompt** ("Transcribe verbatim with standard punctuation. Include filler words and incomplete utterances.") — 22% reduction in voice-agent hallucinations, 10% WER and 29% short-utterance error-rate reduction on voice-agent traffic, 5% improvement on medical, and improved EP F1.
+- **Continuous partials during long turns** — partials are emitted incrementally instead of being delayed; turns now stitch up to 60s instead of hard-cutting at 16s/32s.
+- **Early partial at 750ms** of detected speech for faster UI feedback.
+
+#### Streaming API — New Features
+
+- **`continuous_partials` query parameter** — clients can opt into continuous partials during long turns.
+- **Structured logging** — both the U3 Pro ASR server and the universal ASR server now honor `USE_STRUCTURED_LOGGING`, matching the streaming-api behavior.
+
+#### Other Improvements
+
+- Various logging and metrics improvements across the streaming-api and ASR services.
+- Bug fixes and stability improvements.
 
 ### v0.5.0
 
