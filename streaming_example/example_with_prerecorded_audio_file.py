@@ -150,6 +150,10 @@ def _read_from_ws(ws: ClientConnection) -> None:
                 LOGGER.info(
                     f"Session completed with session duration: {data['session_duration_seconds']} sec.",
                 )
+            elif data["type"] == "SpeechStarted":
+                LOGGER.info(
+                    f"Speech started event. Timestamp: {data['timestamp']}ms, confidence: {data['confidence']}",
+                )
             else:
                 LOGGER.error(f"Unknown message type: {data}")
     except Exception as e:
