@@ -334,7 +334,7 @@ The `/v1/status` endpoint provides real-time information about the license valid
 
 #### U3 Pro — New Self-Hosted Stack (NEW)
 
-This release introduces the **U3 Pro self-hosted stack** (`docker-compose.u3pro.yml`), which serves the U3 Pro async model. U3 Pro delivers significant improvements over the universal English model on complex entities, short utterances, and end-of-turn (EOT) latency, and is targeted at voice agent scenarios.
+This release introduces the **U3 Pro self-hosted stack** (`docker-compose.u3pro.yml`), which serves the U3 Pro streaming model. U3 Pro delivers significant improvements over the universal English model on complex entities, short utterances, and end-of-turn (EOT) latency, and is targeted at voice agent scenarios.
 
 Hardware: NVIDIA L4 / A10 / A100 / L40S / H100 (24 GB+ VRAM).
 
