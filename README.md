@@ -9,8 +9,8 @@ and, within each service, by **model**.
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
-| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
   stack serves multiple models; the client selects the model per session. See
@@ -136,7 +136,7 @@ Pro async model. Universal-3.5 Pro delivers significant improvements over the
 universal English model on complex entities, short utterances, and end-of-turn
 (EOT) latency, and is targeted at voice agent scenarios.
 
-Hardware: NVIDIA L4 / A10 / A100 / L40S / H100 (24 GB+ VRAM).
+Hardware: tested on NVIDIA L40S (48 GB) and RTX PRO 6000 Blackwell (96 GB); the model weights use ~11 GB of VRAM, the rest is KV cache.
 
 Highlights of Universal-3.5 Pro behavior delivered with this release:
 

@@ -15,7 +15,7 @@ they are mutually exclusive (run one at a time):
 | File | Models served | GPU requirement |
 |------|--------------|-----------------|
 | `docker-compose.english-multilang.yml` | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| `docker-compose.universal-3-5-pro.yml` | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| `docker-compose.universal-3-5-pro.yml` | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 |
 
 To switch between stacks, run `docker compose -f <file> down` before starting the other.
 
@@ -241,7 +241,7 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 
 ### streaming-asr-universal-3-5-pro service
 - **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr-universal-3-5-pro container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: NVIDIA L4 / A10 / A100 / L40S / H100 or equivalent with at least 24 GB VRAM. The container also needs ~14 GB of disk for the bundled model weights.
+- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000. The model weights use ~11 GB of VRAM; the remaining VRAM becomes vLLM KV cache and sets max concurrency (more VRAM, higher concurrency). Allow ~30 GB of disk for the ~23 GB Docker image plus working space.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
