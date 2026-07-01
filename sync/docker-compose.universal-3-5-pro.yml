@@ -23,6 +23,10 @@ services:
       - GPU_MONITORING_ENABLED=False
       # Enables self-hosted usage reporting + the license-validation thread.
       - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
+      # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
+      # image), crashing the engine. Disabling it is safe on supported GPUs too.
+      - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
       # Ready once the model is warm (cold start can take a few minutes).
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]

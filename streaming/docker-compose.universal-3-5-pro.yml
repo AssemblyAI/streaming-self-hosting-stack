@@ -60,6 +60,10 @@ services:
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
       - MAX_OPEN_STREAMS=32
+      # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
+      # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
+      # image), crashing the engine. Disabling it is safe on supported GPUs too.
+      - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
