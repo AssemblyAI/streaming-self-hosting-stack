@@ -1,10 +1,11 @@
 # Standalone self-hosted streaming stack using the Universal-3.5 Pro ASR backend.
 #
-# This is the U3 Pro stack served from the universal-3-5-pro image
-# (STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE). It is otherwise identical to
-# docker-compose.u3pro.yml — same nginx `u3-pro` routing, same service names —
-# so websocket clients still select it with speech_model "u3-rt-pro".
-# Run only one streaming stack at a time.
+# Serves the Universal-3.5 Pro model (STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE).
+# Websocket clients select it with speech_model "universal-3-5-pro", which the
+# load balancer routes (X-Model-Version: universal-3-5-pro) to the
+# streaming-asr-universal-3-5-pro backend.
+# Run one streaming stack at a time: each stack binds the same host ports
+# (8080/8081/50051/8082), so they cannot run side by side.
 #
 # Usage:
 #   docker compose -f docker-compose.universal-3-5-pro.yml up -d
@@ -46,11 +47,11 @@ services:
     volumes:
       - ./nginx_streaming_asr.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - streaming-asr-u3pro
+      - streaming-asr-universal-3-5-pro
     networks:
       - streaming-network
 
-  streaming-asr-u3pro:
+  streaming-asr-universal-3-5-pro:
     image: ${STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE}
     ports:
       - "50051:50051"

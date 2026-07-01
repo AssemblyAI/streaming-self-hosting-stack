@@ -9,8 +9,8 @@ and, within each service, by **model**.
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
-| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
   stack serves multiple models; the client selects the model per session. See
@@ -27,8 +27,8 @@ service directory.
 
 ```
 .
-├── streaming/   # WebSocket streaming ASR (Universal English/Multilingual, U3 Pro)
-└── sync/        # Synchronous full-file HTTP transcription (U3 Pro)
+├── streaming/   # WebSocket streaming ASR (Universal English/Multilingual, Universal-3.5 Pro)
+└── sync/        # Synchronous full-file HTTP transcription (Universal-3.5 Pro)
 ```
 
 ## Prerequisites (all services)
@@ -128,17 +128,17 @@ until the first successful validation).
 
 ### v0.6.0
 
-#### U3 Pro — New Self-Hosted Stack (NEW)
+#### Universal-3.5 Pro — New Self-Hosted Stack (NEW)
 
-This release introduces the **U3 Pro self-hosted stack**
-(`streaming/docker-compose.u3pro.yml`), which serves the U3 Pro async model. U3
-Pro delivers significant improvements over the universal English model on
-complex entities, short utterances, and end-of-turn (EOT) latency, and is
-targeted at voice agent scenarios.
+This release introduces the **Universal-3.5 Pro self-hosted stack**
+(`streaming/docker-compose.universal-3-5-pro.yml`), which serves the Universal-3.5
+Pro async model. Universal-3.5 Pro delivers significant improvements over the
+universal English model on complex entities, short utterances, and end-of-turn
+(EOT) latency, and is targeted at voice agent scenarios.
 
 Hardware: NVIDIA L4 / A10 / A100 / L40S / H100 (24 GB+ VRAM).
 
-Highlights of U3 Pro behavior delivered with this release:
+Highlights of Universal-3.5 Pro behavior delivered with this release:
 
 - **New transcription prompt** ("Transcribe verbatim with standard punctuation. Include filler words and incomplete utterances.") — 22% reduction in voice-agent hallucinations, 10% WER and 29% short-utterance error-rate reduction on voice-agent traffic, 5% improvement on medical, and improved EP F1.
 - **Continuous partials during long turns** — partials are emitted incrementally instead of being delayed; turns now stitch up to 60s instead of hard-cutting at 16s/32s.
@@ -147,7 +147,7 @@ Highlights of U3 Pro behavior delivered with this release:
 #### Streaming API — New Features
 
 - **`continuous_partials` query parameter** — clients can opt into continuous partials during long turns.
-- **Structured logging** — both the U3 Pro ASR server and the universal ASR server now honor `USE_STRUCTURED_LOGGING`, matching the streaming-api behavior.
+- **Structured logging** — both the Universal-3.5 Pro ASR server and the universal ASR server now honor `USE_STRUCTURED_LOGGING`, matching the streaming-api behavior.
 
 #### Other Improvements
 

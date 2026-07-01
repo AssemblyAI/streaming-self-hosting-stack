@@ -1,11 +1,11 @@
 # Standalone self-hosted sync (synchronous full-file HTTP) transcription stack.
 #
-# Sync is self-contained: a single FastAPI + vLLM GPU container that does its
+# Sync is self-contained: a single GPU container that does its
 # own inference, so this stack is just the API plus the license-and-usage-proxy
 # — no streaming-api, no nginx load balancer, no separate gRPC ASR backend.
 #
 # Usage (run from the sync/ directory):
-#   docker compose -f docker-compose.u3pro.yml up -d
+#   docker compose -f docker-compose.universal-3-5-pro.yml up -d
 #
 # POST audio to http://localhost:8080/transcribe (see README + example/).
 

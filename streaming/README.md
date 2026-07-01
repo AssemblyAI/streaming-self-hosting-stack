@@ -9,13 +9,13 @@ Real-time transcription over a WebSocket connection. Run all commands from this
 
 ## Choosing a stack
 
-Two compose files are shipped. Pick the one that matches the model you want to
-serve — they are mutually exclusive (run one at a time):
+Two stacks are shipped. Pick the one that matches the model you want to serve —
+they are mutually exclusive (run one at a time):
 
 | File | Models served | GPU requirement |
 |------|--------------|-----------------|
 | `docker-compose.english-multilang.yml` | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| `docker-compose.u3pro.yml` | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| `docker-compose.universal-3-5-pro.yml` | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
 
 To switch between stacks, run `docker compose -f <file> down` before starting the other.
 
@@ -28,7 +28,7 @@ Both stacks include:
 
 ASR backends differ by stack:
 - Universal stack (`docker-compose.english-multilang.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
-- U3 Pro stack (`docker-compose.u3pro.yml`): `streaming-asr-u3pro`.
+- Universal-3.5 Pro stack (`docker-compose.universal-3-5-pro.yml`): `streaming-asr-universal-3-5-pro`.
 
 ## Connection flow
 
@@ -45,7 +45,7 @@ Websocket client → streaming-api:8080 (WebSocket)
                                                                                 └── ml-default → streaming-asr-multilang:50051 (gRPC)
 ```
 
-**U3 Pro stack** (`docker-compose.u3pro.yml`):
+**Universal-3.5 Pro stack** (`docker-compose.universal-3-5-pro.yml`):
 ```
 Websocket client → streaming-api:8080 (WebSocket)
                           │
@@ -54,7 +54,7 @@ Websocket client → streaming-api:8080 (WebSocket)
                           ├─ License validation  ─────────┘
                           │
                           └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                                └── u3-pro → streaming-asr-u3pro:50051 (gRPC)
+                                                                                └── universal-3-5-pro → streaming-asr-universal-3-5-pro:50051 (gRPC)
 ```
 
 Both stacks share the same `nginx_streaming_asr.conf`, which routes by
@@ -82,8 +82,8 @@ LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
 
-# Required for the U3 Pro stack (docker-compose.u3pro.yml):
-STREAMING_ASR_U3PRO_IMAGE=<CUSTOM_IMAGE>
+# Required for the Universal-3.5 Pro stack (docker-compose.universal-3-5-pro.yml):
+STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE=<CUSTOM_IMAGE>
 ```
 
 Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in the compose file).
@@ -91,9 +91,9 @@ Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in th
 ## Run
 
 Both stacks use the same `streaming-api`, load balancer, and license proxy —
-they differ only in the ASR backend. For the U3 Pro stack, websocket clients
-should set query parameter `speech_model` to `u3-rt-pro` so the load balancer
-routes to the U3 Pro backend.
+they differ only in the ASR backend. For the Universal-3.5 Pro stack, websocket clients
+should set query parameter `speech_model` to `universal-3-5-pro` so the load balancer
+routes to the Universal-3.5 Pro backend.
 
 **Universal stack** (English + Multilingual):
 ```bash
@@ -107,16 +107,16 @@ docker compose -f docker-compose.english-multilang.yml ps
 docker compose -f docker-compose.english-multilang.yml down
 ```
 
-**U3 Pro stack**:
+**Universal-3.5 Pro stack**:
 ```bash
-docker compose -f docker-compose.u3pro.yml up -d
-docker compose -f docker-compose.u3pro.yml logs -f
+docker compose -f docker-compose.universal-3-5-pro.yml up -d
+docker compose -f docker-compose.universal-3-5-pro.yml logs -f
 
 # Check service status
-docker compose -f docker-compose.u3pro.yml ps
+docker compose -f docker-compose.universal-3-5-pro.yml ps
 
 # Stop services before switching stacks
-docker compose -f docker-compose.u3pro.yml down
+docker compose -f docker-compose.universal-3-5-pro.yml down
 ```
 
 ## Service endpoints
@@ -129,8 +129,8 @@ A Python example script is provided to demonstrate how to stream audio to the st
 
 _Note_: You can initiate a session as soon as the relevant ASR container is
 healthy. `streaming-asr-english` and `streaming-asr-multilang` log "Ready to
-serve!" when ready (typically ~2 min). `streaming-asr-u3pro` logs "U3Pro ASR
-Server ready!" when ready (typically ~5 min).
+serve!" when ready (typically ~2 min); `streaming-asr-universal-3-5-pro` logs its
+ready message when warm (typically ~5 min).
 
 Change into the `example/` directory:
 ```bash
@@ -159,9 +159,9 @@ The example script (`example_with_prerecorded_audio_file.py`) accepts several CL
     ```bash
     python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-multilingual"
     ```
-- U3 Pro stack:
+- Universal-3.5 Pro stack:
     ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "u3-rt-pro"
+    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-3-5-pro"
     ```
 
 **Command-line arguments:**
@@ -183,7 +183,7 @@ python example_with_prerecorded_audio_file.py --help
 
 **ASR Load Balancer** (`nginx_streaming_asr.conf`):
 - gRPC proxying to ASR services.
-- Routes to the English, Multilingual, or U3 Pro backend based on the `X-Model-Version` header value.
+- Routes to the English, Multilingual, or Universal-3.5 Pro backend based on the `X-Model-Version` header value.
 
 ### Usage reporting
 
@@ -211,8 +211,8 @@ docker compose -f docker-compose.english-multilang.yml restart streaming-api
 docker compose -f docker-compose.english-multilang.yml restart streaming-asr-english
 docker compose -f docker-compose.english-multilang.yml restart streaming-asr-multilang
 
-# Restart specific service (U3 Pro stack)
-docker compose -f docker-compose.u3pro.yml restart streaming-asr-u3pro
+# Restart specific service (Universal-3.5 Pro stack)
+docker compose -f docker-compose.universal-3-5-pro.yml restart streaming-asr-universal-3-5-pro
 ```
 
 ## Production deployment recommendations
@@ -239,8 +239,8 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
 
-### streaming-asr-u3pro service
-- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr-u3-pro container if a persistent connection gets disrupted with minimal state loss.
+### streaming-asr-universal-3-5-pro service
+- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr-universal-3-5-pro container if a persistent connection gets disrupted with minimal state loss.
 - **Hardware Requirements**: NVIDIA L4 / A10 / A100 / L40S / H100 or equivalent with at least 24 GB VRAM. The container also needs ~14 GB of disk for the bundled model weights.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.

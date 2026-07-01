@@ -1,6 +1,6 @@
 # Sync (synchronous HTTP) self-hosted stack
 
-Synchronous full-file transcription on U3 Pro: POST audio, get the entire
+Synchronous full-file transcription on Universal-3.5 Pro: POST audio, get the entire
 transcript back in one HTTP response. Run all commands from this `sync/`
 directory.
 
@@ -8,15 +8,15 @@ directory.
 > license-and-usage-proxy (usage reporting, license status endpoint, proxy
 > production recommendations) are documented in the [top-level README](../README.md).
 
-The stack (`docker-compose.u3pro.yml`) runs two containers — `sync-api` (FastAPI
-+ vLLM, GPU) and `license-and-usage-proxy` — with no nginx load balancer and no
+The stack (`docker-compose.universal-3-5-pro.yml`) runs two containers — `sync-api`
+(GPU) and `license-and-usage-proxy` — with no nginx load balancer and no
 separate ASR backend. Authentication and rate limiting are expected to be
 handled at your own infrastructure layer (reverse proxy / API gateway); the
 service accepts all requests.
 
 | File | API | Models served | GPU requirement |
 |------|-----|--------------|-----------------|
-| `docker-compose.u3pro.yml` | Sync (synchronous HTTP) | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+| `docker-compose.universal-3-5-pro.yml` | Sync (synchronous HTTP) | Universal-3.5 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
 
 ## Setup
 
@@ -33,15 +33,18 @@ Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in th
 ## Run
 
 ```bash
-docker compose -f docker-compose.u3pro.yml up -d
-docker compose -f docker-compose.u3pro.yml logs -f
+docker compose -f docker-compose.universal-3-5-pro.yml up -d
+docker compose -f docker-compose.universal-3-5-pro.yml logs -f
 
 # Stop
-docker compose -f docker-compose.u3pro.yml down
+docker compose -f docker-compose.universal-3-5-pro.yml down
 ```
 
 The `sync-api` container is ready once the model is warm (cold start can take a
-few minutes while weights load and the engine warms up).
+few minutes while weights load and the engine warms up). It exposes
+`GET /readyz` (returns `200` once warm, `503` during cold start), which the
+container uses as its Docker healthcheck — point your load balancer's readiness
+probe at it so requests are only routed once the model is warm.
 
 ## Verify
 
