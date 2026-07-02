@@ -126,19 +126,61 @@ until the first successful validation).
 
 ## Changelog
 
+### v1.0.0
+
+#### Repository restructure
+
+The repository is now organized by **service**: [`streaming/`](streaming/)
+(WebSocket, real-time) and [`sync/`](sync/) (synchronous HTTP, full-file). Each
+service directory is self-contained — compose files, `.env.example`, example
+client, and README live together. Compose files moved accordingly (e.g.
+`docker-compose.yml` → `streaming/docker-compose.english-multilang.yml`).
+
+#### Sync — New Self-Hosted Service (NEW)
+
+This release introduces the **Sync self-hosted service**
+(`sync/docker-compose.universal-3-5-pro.yml`), serving the Universal-3.5 Pro
+model. It transcribes a complete audio file (≤ 120 s) in a single
+`POST /transcribe` request/response — a single GPU container plus the
+license-and-usage-proxy, no load balancer. It exposes `GET /readyz` (200 once
+the model is warm) for readiness probes. See [`sync/README.md`](sync/README.md).
+
+#### Streaming — U3 Pro replaced by Universal-3.5 Pro (BREAKING)
+
+The U3 Pro stack introduced in v0.6.0 is replaced by the **Universal-3.5 Pro
+stack** (`streaming/docker-compose.universal-3-5-pro.yml`). If you are
+upgrading from the v0.6.0 U3 Pro stack:
+
+- **`speech_model` value changed** — clients must connect with
+  `speech_model=universal-3-5-pro`. The previous value `u3-rt-pro` is no longer
+  routed by the load balancer and sessions requesting it will fail.
+- **Image env var renamed** — `STREAMING_ASR_U3PRO_IMAGE` is now
+  `STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE`, pointing at the
+  `self-hosted-streaming-asr-universal-3-5-pro` image.
+- **Compose file renamed** — `docker-compose.u3pro.yml` is now
+  `streaming/docker-compose.universal-3-5-pro.yml`.
+- **Hardware recommendations updated** — tested on NVIDIA L40S (48 GB) and
+  RTX PRO 6000 Blackwell (96 GB); the model weights use ~11 GB of VRAM, the
+  rest becomes KV cache and sets max concurrency.
+
+#### Images
+
+`release-v1.0.0` is published for `self-hosted-streaming-api`,
+`self-hosted-streaming-license-and-usage-proxy`,
+`self-hosted-streaming-asr-universal-3-5-pro`, and `self-hosted-sync-asr-u3-pro`.
+The English and Multilingual ASR images are unchanged since v0.6.0 — keep
+`STREAMING_ASR_ENGLISH_IMAGE` and `STREAMING_ASR_MULTILANG_IMAGE` at
+`release-v0.6.0` (see `streaming/.env.example`).
+
 ### v0.6.0
 
-#### Universal-3.5 Pro — New Self-Hosted Stack (NEW)
+#### U3 Pro — New Self-Hosted Stack (NEW)
 
-This release introduces the **Universal-3.5 Pro self-hosted stack**
-(`streaming/docker-compose.universal-3-5-pro.yml`), which serves the Universal-3.5
-Pro async model. Universal-3.5 Pro delivers significant improvements over the
-universal English model on complex entities, short utterances, and end-of-turn
-(EOT) latency, and is targeted at voice agent scenarios.
+This release introduces the **U3 Pro self-hosted stack** (`docker-compose.u3pro.yml`), which serves the U3 Pro streaming model. U3 Pro delivers significant improvements over the universal English model on complex entities, short utterances, and end-of-turn (EOT) latency, and is targeted at voice agent scenarios.
 
-Hardware: tested on NVIDIA L40S (48 GB) and RTX PRO 6000 Blackwell (96 GB); the model weights use ~11 GB of VRAM, the rest is KV cache.
+Hardware: NVIDIA L4 / A10 / A100 / L40S / H100 (24 GB+ VRAM).
 
-Highlights of Universal-3.5 Pro behavior delivered with this release:
+Highlights of U3 Pro behavior delivered with this release:
 
 - **New transcription prompt** ("Transcribe verbatim with standard punctuation. Include filler words and incomplete utterances.") — 22% reduction in voice-agent hallucinations, 10% WER and 29% short-utterance error-rate reduction on voice-agent traffic, 5% improvement on medical, and improved EP F1.
 - **Continuous partials during long turns** — partials are emitted incrementally instead of being delayed; turns now stitch up to 60s instead of hard-cutting at 16s/32s.
@@ -147,7 +189,7 @@ Highlights of Universal-3.5 Pro behavior delivered with this release:
 #### Streaming API — New Features
 
 - **`continuous_partials` query parameter** — clients can opt into continuous partials during long turns.
-- **Structured logging** — both the Universal-3.5 Pro ASR server and the universal ASR server now honor `USE_STRUCTURED_LOGGING`, matching the streaming-api behavior.
+- **Structured logging** — both the U3 Pro ASR server and the universal ASR server now honor `USE_STRUCTURED_LOGGING`, matching the streaming-api behavior.
 
 #### Other Improvements
 

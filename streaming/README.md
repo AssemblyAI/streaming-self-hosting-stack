@@ -129,8 +129,8 @@ A Python example script is provided to demonstrate how to stream audio to the st
 
 _Note_: You can initiate a session as soon as the relevant ASR container is
 healthy. `streaming-asr-english` and `streaming-asr-multilang` log "Ready to
-serve!" when ready (typically ~2 min); `streaming-asr-universal-3-5-pro` logs its
-ready message when warm (typically ~5 min).
+serve!" when ready (typically ~2 min); `streaming-asr-universal-3-5-pro` logs
+"U3Pro ASR Server ready!" when warm (typically ~5 min).
 
 Change into the `example/` directory:
 ```bash
