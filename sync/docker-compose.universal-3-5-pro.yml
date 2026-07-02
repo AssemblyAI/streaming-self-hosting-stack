@@ -1,0 +1,75 @@
+# Standalone self-hosted sync (synchronous full-file HTTP) transcription stack.
+#
+# Sync is self-contained: a single GPU container that does its
+# own inference, so this stack is just the API plus the license-and-usage-proxy
+# — no streaming-api, no nginx load balancer, no separate gRPC ASR backend.
+#
+# Usage (run from the sync/ directory):
+#   docker compose -f docker-compose.universal-3-5-pro.yml up -d
+#
+# POST audio to http://localhost:8080/transcribe (see README + example/).
+
+services:
+  sync-api:
+    image: ${SYNC_API_IMAGE}
+    ports:
+      - "8080:8080"
+    environment:
+      - HTTP_PORT=8080
+      - AAI_ENV=production
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      # GPU monitoring emits to CloudWatch; off in self-hosted deployments.
+      - GPU_MONITORING_ENABLED=False
+      # Enables self-hosted usage reporting + the license-validation thread.
+      - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
+      # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
+      # image), crashing the engine. Disabling it is safe on supported GPUs too.
+      - VLLM_USE_FLASHINFER_SAMPLER=0
+    healthcheck:
+      # Ready once the model is warm (cold start can take a few minutes).
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 300s
+    depends_on:
+      - license-and-usage-proxy
+    networks:
+      - sync-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+
+  license-and-usage-proxy:
+    image: ${LICENSE_AND_USAGE_PROXY_IMAGE}
+    ports:
+      - "8082:8080"
+    environment:
+      - HTTP_PORT=8080
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      - LICENSE_FILE_PATH=/var/aai_license.jwt
+      - USAGE_TRACKING_API_KEY=${USAGE_TRACKING_API_KEY} # Set if license is for usage-based billing
+    volumes:
+      - ./license.jwt:/var/aai_license.jwt:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 10s
+    networks:
+      - sync-network
+
+networks:
+  sync-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

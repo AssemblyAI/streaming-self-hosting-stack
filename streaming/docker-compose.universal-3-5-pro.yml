@@ -1,11 +1,14 @@
-# Standalone self-hosted streaming stack using the U3 Pro ASR backend.
+# Standalone self-hosted streaming stack using the Universal-3.5 Pro ASR backend.
 #
-# Use this compose file instead of docker-compose.yml when you want to run
-# only the U3 Pro model (not the universal English/Multilingual models).
-# These two stacks are mutually exclusive — only run one at a time.
+# Serves the Universal-3.5 Pro model (STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE).
+# Websocket clients select it with speech_model "universal-3-5-pro", which the
+# load balancer routes (X-Model-Version: universal-3-5-pro) to the
+# streaming-asr-universal-3-5-pro backend.
+# Run one streaming stack at a time: each stack binds the same host ports
+# (8080/8081/50051/8082), so they cannot run side by side.
 #
 # Usage:
-#   docker compose -f docker-compose.u3pro.yml up -d
+#   docker compose -f docker-compose.universal-3-5-pro.yml up -d
 
 services:
   streaming-api:
@@ -44,12 +47,12 @@ services:
     volumes:
       - ./nginx_streaming_asr.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - streaming-asr-u3pro
+      - streaming-asr-universal-3-5-pro
     networks:
       - streaming-network
 
-  streaming-asr-u3pro:
-    image: ${STREAMING_ASR_U3PRO_IMAGE}
+  streaming-asr-universal-3-5-pro:
+    image: ${STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE}
     ports:
       - "50051:50051"
     environment:
@@ -57,6 +60,10 @@ services:
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
       - MAX_OPEN_STREAMS=32
+      # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
+      # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
+      # image), crashing the engine. Disabling it is safe on supported GPUs too.
+      - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s

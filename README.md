@@ -1,295 +1,98 @@
-# Streaming Self-Hosted Services Docker Compose
+# AssemblyAI Self-Hosted Services
 
-This Docker Compose configuration runs the AssemblyAI streaming services as a standalone self-hosted stack.
+Docker Compose stacks for running AssemblyAI transcription services on your own
+infrastructure. The stacks are organized by **service** (the API you talk to)
+and, within each service, by **model**.
 
-## Choosing a stack
+## Choosing a service and model
 
-Two compose files are shipped. Pick the one that matches the model you want to serve — they are mutually exclusive (run one at a time):
+| Service | Directory | API | Models | GPU requirement |
+|---------|-----------|-----|--------|-----------------|
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
-| File | Models served | GPU requirement |
-|------|--------------|-----------------|
-| `docker-compose.yml` | Universal English + Multilingual streaming | NVIDIA T4+ per ASR container |
-| `docker-compose.u3pro.yml` | U3 Pro | 24 GB+ VRAM (e.g. L4, A10, A100); image bundles ~14 GB of weights |
+- **Streaming** transcribes a live audio stream over a WebSocket connection. One
+  stack serves multiple models; the client selects the model per session. See
+  [`streaming/README.md`](streaming/README.md).
+- **Sync** transcribes a complete file in a single HTTP request/response (audio
+  ≤ 120 s). It is self-contained — a single GPU container plus the
+  license-and-usage-proxy, no load balancer. See [`sync/README.md`](sync/README.md).
 
-To switch between stacks, run `docker compose down` (or `docker compose -f docker-compose.u3pro.yml down`) before starting the other.
+Each service directory is self-contained: its compose file(s), `.env.example`,
+example client, and `README.md` live together. Run commands from inside the
+service directory.
 
-## Services Included
-Both stacks include:
-- **streaming-api**: Gateway API service handling WebSocket connections.
-- **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
-- **license-and-usage-proxy**: License validation and usage reporting service.
+## Repository layout
 
-ASR backends differ by stack:
-- Universal stack (`docker-compose.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
-- U3 Pro stack (`docker-compose.u3pro.yml`): `streaming-asr-u3pro`.
-
-## Connection Flow
-
-**Universal stack** (`docker-compose.yml`):
 ```
-Websocket client → streaming-api:8080 (WebSocket)
-                          │
-                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
-                          │                               │
-                          ├─ License validation  ─────────┘
-                          │
-                          └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                                ├── en-default → streaming-asr-english:50051 (gRPC)
-                                                                                └── ml-default → streaming-asr-multilang:50051 (gRPC)
+.
+├── streaming/   # WebSocket streaming ASR (Universal English/Multilingual, Universal-3.5 Pro)
+└── sync/        # Synchronous full-file HTTP transcription (Universal-3.5 Pro)
 ```
 
-**U3 Pro stack** (`docker-compose.u3pro.yml`):
-```
-Websocket client → streaming-api:8080 (WebSocket)
-                          │
-                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
-                          │                               │
-                          ├─ License validation  ─────────┘
-                          │
-                          └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                                └── u3-pro → streaming-asr-u3pro:50051 (gRPC)
-```
+## Prerequisites (all services)
 
-Both stacks share the same `nginx_streaming_asr.conf`, which routes by `X-Model-Version` header. Each stack only deploys the backends it needs — websocket clients should use a `speech_model` query parameter value that routes to an available backend.
+1. **AssemblyAI license** valid for the self-hosted product (the `license.jwt` file).
+2. **Docker & Docker Compose**.
+3. **GPU support**: NVIDIA Container Toolkit for GPU-enabled containers.
+4. **AWS access**: credentials that can pull images from AssemblyAI's ECR.
 
-## Prerequisites
-1. **AssemblyAI license**: Valid for the streaming self-hosted product.
-2. **Docker & Docker Compose**: Ensure Docker and Docker Compose are installed.
-3. **GPU Support**: NVIDIA Container Toolkit for GPU-enabled services.
-4. **AWS Access**: Valid AWS credentials to pull images from ECR.
+### GPU runtime setup
 
-## Setup Instructions
-
-### 1. Docker runtime with GPU support
-
-**1.1** Verify NVIDIA drivers are installed:
+Verify NVIDIA drivers:
 ```bash
 nvidia-smi
 ```
 
-**1.2** Install NVIDIA Container Toolkit:
-
-Follow the [NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) to set up GPU support for Docker.
-
-**1.3** Verify the Docker runtime has GPU access:
+Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html),
+then verify the Docker runtime has GPU access:
 ```bash
 docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
 ```
 
-### 2. AWS ECR Authentication
+### ECR authentication
 
 ```bash
-# Login to ECR to pull container images
-aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 344839248844.dkr.ecr.us-west-2.amazonaws.com
+aws ecr get-login-password --region us-west-2 \
+  | docker login --username AWS --password-stdin 344839248844.dkr.ecr.us-west-2.amazonaws.com
 ```
 
-### 3. Configure Container Images
+### License file
 
-Use the reference `.env.example` file to create a `.env` file with container image references:
+Place your AssemblyAI `license.jwt` in the directory of the service you are
+running (`streaming/` or `sync/`), or point the `LICENSE_FILE_PATH` environment
+variable in that service's compose file at your license file's location.
 
-Set the image variables relevant to the stack you plan to run:
+## Shared component: license-and-usage-proxy
 
-```bash
-# Required for both stacks:
-STREAMING_API_IMAGE=<CUSTOM_IMAGE>
-LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
+Every service runs the **license-and-usage-proxy** alongside it. It validates
+your license and, for usage-based licenses, reports usage to AssemblyAI. Its
+configuration and operational behavior are the same regardless of service.
 
-# Required for the universal stack (docker-compose.yml):
-STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
-STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
+### Usage reporting
 
-# Required for the U3 Pro stack (docker-compose.u3pro.yml):
-STREAMING_ASR_U3PRO_IMAGE=<CUSTOM_IMAGE>
-```
+The proxy supports two billing modes based on your license:
 
-### 4. Have the license file ready
+- **Flat billing** — usage tracking is disabled; no extra configuration needed.
+- **Usage-based billing** — the proxy reports usage to AssemblyAI's usage
+  tracker. Set `USAGE_TRACKING_API_KEY` (any key from the AssemblyAI dashboard)
+  for the `license-and-usage-proxy` service.
 
-Ensure you have your AssemblyAI license file in the current working directory as `license.jwt`, or modify the `LICENSE_FILE_PATH` environment variable in the relevant Docker Compose file to point to your license file location.
+**Behavior with usage-based billing:**
+- At startup the proxy validates connectivity by registering with
+  https://usage-tracker.assemblyai.com. If validation fails, the proxy shuts down.
+- Usage is batched and reported every few seconds, with automatic retries.
+- If https://usage-tracker.assemblyai.com stays unreachable and all retries fail
+  (after 5–60 minutes), the proxy terminates itself as a fail-safe to protect
+  usage-data integrity. Your orchestrator should replace the container.
+- If the in-memory usage queue exceeds 1000 items, the proxy logs a warning
+  suggesting you upscale.
 
-### 5. Run Services
+### License status endpoint
 
-Pick the stack you want to run. Both use the same `streaming-api`, load balancer, and license proxy — they differ only in the ASR backend.
+`GET /v1/status` reports the live license-validation state:
 
-For the U3 Pro stack, websocket clients should set query parameter `speech_model` to "u3-rt-pro" so the load balancer routes to the U3 Pro backend.
-
-
-**Universal stack** (English + Multilingual):
-```bash
-docker compose up -d
-
-docker compose logs -f
-
-# Check service status
-docker compose ps
-
-# Stop services before switching stacks
-docker compose down
-```
-
-**U3 Pro stack**:
-```bash
-docker compose -f docker-compose.u3pro.yml up -d
-
-docker compose -f docker-compose.u3pro.yml logs -f
-
-# Check service status
-docker compose ps
-
-# Stop services before switching stacks
-docker compose -f docker-compose.u3pro.yml down
-```
-## Service Endpoints
-
-- **WebSocket**: `ws://localhost:8080`
-
-## Running the Streaming Example
-
-A Python example script is provided to demonstrate how to stream audio to the self-hosted stack.
-
-_Note_: You can initiate a session as soon as the relevant ASR container is healthy. `streaming-asr-english` and `streaming-asr-multilang` log "Ready to serve!" when ready (typically ~2 min). `streaming-asr-u3pro` logs "U3Pro ASR Server ready!" when ready (typically ~5 min).
-
-Change the current directory to the `streaming_example` directory:
-``` bash
-cd streaming_example
-```
-
-Create a fresh Python virtual environment and activate it:
-```bash
-python -m venv streaming_venv
-source streaming_venv/bin/activate
-```
-
-Install the required packages to run the example script:
-```bash
-pip install -r requirements.txt
-```
-
-The example script (`example_with_prerecorded_audio_file.py`) accepts several CLI arguments:
-
-**Basic usage:**
-- Universal stack English:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-english"
-    ```
-- Universal stack Multilingual:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-multilingual"
-    ```
-- U3 Pro stack:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "u3-rt-pro"
-    ```
-
-**Command-line arguments:**
-
-| Argument | Description                                            | Default                  |
-|----------|--------------------------------------------------------|--------------------------|
-| `--audio-file` | Path to the audio file to transcribe                   | `example_audio_file.wav` |
-| `--endpoint` | WebSocket endpoint URL                                 | `ws://localhost:8080`     |
-| `--speech-model` | Speech model to use (e.g., 'universal-streaming-multilingual') | ``               |
-
-**View help:**
-```bash
-python example_with_prerecorded_audio_file.py --help
-```
-
-## Configuration
-
-### Nginx Configuration
-**ASR Load Balancer** (`nginx_streaming_asr.conf`):
-- gRPC proxying to ASR services.
-- Routes to English or Multilang model based on the `X-Model-Version` header value.
-
-### Usage Reporting Configuration
-
-The license-and-usage-proxy service supports two billing modes based on your AssemblyAI license:
-
-#### Flat Billing Mode
-If your license is configured for flat billing, usage tracking is disabled. No additional configuration is required.
-
-#### Usage-Based Billing Mode
-If your license is configured for usage-based billing, the proxy will automatically report usage data to AssemblyAI's usage tracker service. You must configure the following environment variable in the `docker-compose.yml` for the `license-and-usage-proxy` service:
-
-```yaml
-environment:
-  - USAGE_TRACKING_API_KEY=<your-api-key>
-```
-
-**Important Notes:**
-- For the API key, any key retrieved from the AssemblyAI dashboard can be used.
-- At startup, the proxy validates connectivity by registering with AssemblyAI's https://usage-tracker.assemblyai.com.
-- If connectivity validation fails, the proxy will shut down.
-- Usage data is batched and reported every few seconds.
-- The proxy automatically retries failed requests up to several times.
-
-**Critical Behavior:**
-If https://usage-tracker.assemblyai.com becomes unreachable and all retry attempts fail (after 5-60 minutes), the license-and-usage-proxy service will terminate itself. This is a fail-safe mechanism to ensure usage data integrity. Your service orchestrator should be configured to automatically replace the container with a new one.
-
-**Monitoring Recommendations:**
-- Monitor the proxy's logs for warnings about failed usage reporting attempts.
-- Set up alerts for proxy restarts, which may indicate persistent connectivity issues.
-- If the in-memory usage queue size exceeds 1000 items, the proxy will log a warning suggesting upscaling.
-
-## Monitoring & Debugging
-### Check Service Status
-```bash
-# Container status
-docker compose ps
-
-# Resource usage
-docker stats
-```
-
-## Troubleshooting
-
-### Debug Commands
-
-```bash
-# Check nginx configurations
-docker compose exec streaming-asr-lb nginx -t
-
-# Restart specific service (universal stack)
-docker compose restart streaming-api
-docker compose restart streaming-asr-english
-docker compose restart streaming-asr-multilang
-
-# Restart specific service (U3 Pro stack)
-docker compose -f docker-compose.u3pro.yml restart streaming-asr-u3pro
-```
-
-## Production Deployment Recommendations
-
-### streaming-api service
-
-- **Deployment Strategy**: We recommend doing Blue/Green deployments to avoid disrupting ongoing sessions. Once you fully shift the traffic to the new color, wait at least 3 hours (the max session duration) before shutting down the old color to ensure no sessions get disrupted.
-- **Resource Allocation**: We recommend allocating 1 CPU per container with at least 2GB of RAM for better hardware utilization. For example, it's better to have 4 containers with 1 CPU and 2GB RAM each rather than 1 container with 4 CPU and 8GB RAM.
-- **Autoscaling**: We recommend setting up autoscaling based on the number of active sessions. A container with 1 CPU can generally handle around 32 concurrent sessions.
-- **Monitoring**: Always monitor the logs during deployment to catch any potential issues early.
-- **Dependencies**: For successful startup, the service depends on the license-and-usage-proxy service being up and running.
-- **Configuration**: You can enable features like TLS encryption and structured logging via environment variables.
-- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
-- **Usage Reporting Behavior**: After each session completes, the streaming-api reports usage to the license-and-usage-proxy with automatic retries on failure. Monitor logs any messages at a >= warning level.
-
-### license-and-usage-proxy service
-
-- **Deployment Strategy**: Do gradual rollouts to ensure stability. Consider implementing monitoring and alerting for service restarts.
-- **Resource Allocation**: We recommend allocating 1 CPU per container with at least 2GB of RAM for better hardware utilization. For example, it's better to have 4 containers with 1 CPU and 2GB RAM each rather than 1 container with 4 CPU and 8GB RAM.
-- **Monitoring**: Always monitor logs during deployment to catch any potential issues early. You can set up an alert based on the responses of the `/v1/status` endpoint to alert you on any license issues. For usage-based billing, also monitor for usage reporting warnings and service restarts.
-- **Dependencies**:
-  - For successful startup, the service depends on having a valid license being mounted on the container filesystem. To mount it, set the `LICENSE_FILE_PATH` environment variable to point to the license file path on the host machine.
-  - For usage-based billing, the service also requires connectivity to https://usage-tracker.assemblyai.com at startup. If connectivity validation fails, the container will terminate. Ensure the `USAGE_TRACKING_API_KEY` environment variable is properly configured.
-- **Health Checks**: Use the healthcheck command provided in the docker-compose.yml to monitor container health.
-- **Usage Reporting Resilience**:
-  - Network connectivity to the https://usage-tracker.assemblyai.com endpoint must be reliable for production deployments with usage-based billing.
-  - Run at least a few containers behind a load balancer to ensure high availability.
-
-#### License Status Endpoint
-
-The `/v1/status` endpoint provides real-time information about the license validation state:
-
-**Endpoint**: `GET /v1/status`
-
-**Response Schema**:
 ```json
 {
   "state": "Ready | Connected | TrustBased | Failed",
@@ -298,37 +101,76 @@ The `/v1/status` endpoint provides real-time information about the license valid
 }
 ```
 
-**State Descriptions**:
-- `Ready`: Initial state when the service starts before any license validation has occurred.
-- `Connected`: Last license validation check was successful.
-- `TrustBased`: Last license validation check failed, but the request was within the trust window grace period, so services will remain operational.
-- `Failed`: Last license validation check failed and the trust window has expired. streaming-api containers will shut down and stop serving requests.
+- `Ready` — initial state before any validation has occurred.
+- `Connected` — last validation check succeeded.
+- `TrustBased` — last validation failed but is within the trust-window grace
+  period; services keep serving.
+- `Failed` — last validation failed and the trust window expired; serving
+  containers shut down.
 
-**Fields**:
-- `state`: Current license validation state.
-- `last_successful_checkin`: ISO 8601 timestamp of the last successful license validation (null if never successful).
-- `trust_expiration`: ISO 8601 timestamp when the trust window expires (null if no successful validation yet).
+`last_successful_checkin` and `trust_expiration` are ISO 8601 timestamps (null
+until the first successful validation).
 
-**Recommended Alerts**:
-- Alert when `state` transitions to `TrustBased` (indicates license validation issues).
-- Critical alert when `state` is `Failed` (services will shut down).
+### Production recommendations (license-and-usage-proxy)
 
-### streaming-asr-english and streaming-asr-multilang services
-
-- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: The services can run on NVIDIA T4 or newer GPUs. We recommend allocating at least 4 CPU and 16GB of RAM per container.
-- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container with recommended hardware can generally handle up to 28 concurrent sessions.
-- **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
-- **Health Checks**: Use the healthcheck command provided in the Docker Compose file to monitor container health.
-
-### streaming-asr-u3pro service
-- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr-u3-pro container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: NVIDIA L4 / A10 / A100 / L40S / H100 or equivalent with at least 24 GB VRAM. The container also needs ~14 GB of disk for the bundled model weights.
-- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
-- **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
-- **Health Checks**: Use the healthcheck command provided in the Docker Compose file to monitor container health.
+- **Deployment**: gradual rollouts; alert on service restarts.
+- **Resources**: 1 CPU + ≥ 2 GB RAM per container; prefer more small containers
+  over fewer large ones.
+- **Monitoring**: alert on `/v1/status` transitions to `TrustBased` (warning)
+  and `Failed` (critical). For usage-based billing, also monitor usage-reporting
+  warnings and restarts.
+- **Dependencies**: requires a valid license mounted on the container
+  filesystem (set `LICENSE_FILE_PATH`). For usage-based billing, also requires
+  connectivity to https://usage-tracker.assemblyai.com at startup.
+- **Availability**: run a few containers behind a load balancer.
 
 ## Changelog
+
+### v1.0.0
+
+#### Repository restructure
+
+The repository is now organized by **service**: [`streaming/`](streaming/)
+(WebSocket, real-time) and [`sync/`](sync/) (synchronous HTTP, full-file). Each
+service directory is self-contained — compose files, `.env.example`, example
+client, and README live together. Compose files moved accordingly (e.g.
+`docker-compose.yml` → `streaming/docker-compose.english-multilang.yml`).
+
+#### Sync — New Self-Hosted Service (NEW)
+
+This release introduces the **Sync self-hosted service**
+(`sync/docker-compose.universal-3-5-pro.yml`), serving the Universal-3.5 Pro
+model. It transcribes a complete audio file (≤ 120 s) in a single
+`POST /transcribe` request/response — a single GPU container plus the
+license-and-usage-proxy, no load balancer. It exposes `GET /readyz` (200 once
+the model is warm) for readiness probes. See [`sync/README.md`](sync/README.md).
+
+#### Streaming — U3 Pro replaced by Universal-3.5 Pro (BREAKING)
+
+The U3 Pro stack introduced in v0.6.0 is replaced by the **Universal-3.5 Pro
+stack** (`streaming/docker-compose.universal-3-5-pro.yml`). If you are
+upgrading from the v0.6.0 U3 Pro stack:
+
+- **`speech_model` value changed** — clients must connect with
+  `speech_model=universal-3-5-pro`. The previous value `u3-rt-pro` is no longer
+  routed by the load balancer and sessions requesting it will fail.
+- **Image env var renamed** — `STREAMING_ASR_U3PRO_IMAGE` is now
+  `STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE`, pointing at the
+  `self-hosted-streaming-asr-universal-3-5-pro` image.
+- **Compose file renamed** — `docker-compose.u3pro.yml` is now
+  `streaming/docker-compose.universal-3-5-pro.yml`.
+- **Hardware recommendations updated** — tested on NVIDIA L40S (48 GB) and
+  RTX PRO 6000 Blackwell (96 GB); the model weights use ~11 GB of VRAM, the
+  rest becomes KV cache and sets max concurrency.
+
+#### Images
+
+`release-v1.0.0` is published for `self-hosted-streaming-api`,
+`self-hosted-streaming-license-and-usage-proxy`,
+`self-hosted-streaming-asr-universal-3-5-pro`, and `self-hosted-sync-asr-u3-pro`.
+The English and Multilingual ASR images are unchanged since v0.6.0 — keep
+`STREAMING_ASR_ENGLISH_IMAGE` and `STREAMING_ASR_MULTILANG_IMAGE` at
+`release-v0.6.0` (see `streaming/.env.example`).
 
 ### v0.6.0
 
