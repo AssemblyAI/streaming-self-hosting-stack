@@ -144,7 +144,7 @@ type selects the decoder.
 
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 
@@ -153,7 +153,7 @@ curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
   -F 'config={"prompt":"Transcribe verbatim. Preserve disfluencies.","word_boost":["AssemblyAI","Universal"]};type=application/json' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 
@@ -165,7 +165,7 @@ single code, or a list for multilingual audio.
 ```bash
 curl -F 'audio=@sample.wav;type=audio/wav' \
   -F 'config={"language_code":"es"};type=application/json' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 
@@ -178,7 +178,7 @@ turn goes last.
 ```bash
 curl -F 'audio=@reply.wav;type=audio/wav' \
   -F 'config={"conversation_context":["I'\''d like to book a flight to Denver.","Sure, what date were you thinking?"]};type=application/json' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 
@@ -190,7 +190,7 @@ A single prior turn can be passed as a bare string instead of a list:
 ```bash
 curl -F 'audio=@sample.pcm;type=audio/pcm' \
   -F 'config={"sample_rate":16000,"channels":1};type=application/json' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 
@@ -202,7 +202,7 @@ that strips it):
 ```bash
 curl -F 'audio=@sample.pcm;type=audio/pcm' \
   -F 'config={"sample_rate":16000,"channels":1};type=application/json' \
-  'http://localhost:8080/transcribe?token=self-hosted'
+  'http://localhost:8080/transcribe?token=example'
 ```
 
 ### Python

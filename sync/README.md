@@ -71,7 +71,7 @@ stereo, sample rate one of `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
   -F 'config={"language_code":"en"};type=application/json' \
-  -H 'Authorization: self-hosted' \
+  -H 'Authorization: any value works' \
   http://localhost:8080/transcribe
 ```
 

@@ -41,7 +41,7 @@ def main() -> None:
                 "application/json",
             ),
         },
-        headers={"Authorization": "self-hosted"},
+        headers={"Authorization": "any value works"},
         timeout=120,
     )
     response.raise_for_status()
