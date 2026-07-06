@@ -8,8 +8,7 @@ Usage:
 Defaults to the bundled example_audio_file.wav when no path is given.
 
 The self-hosted service does not validate credentials, but every request
-must carry a non-empty Authorization header — any value works (see
-../API.md#authentication).
+must carry a non-empty Authorization header — any value works.
 """
 
 import json
