@@ -16,7 +16,7 @@ and, within each service, by **model**.
   stack serves multiple models; the client selects the model per session. See
   [`streaming/README.md`](streaming/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
-  ≤ 120 s). It is self-contained — a single GPU container plus the
+  ≤ 120 s by default). It is self-contained — a single GPU container plus the
   license-and-usage-proxy, no load balancer. See [`sync/README.md`](sync/README.md).
 
 Each service directory is self-contained: its compose file(s), `.env.example`,

@@ -23,6 +23,14 @@ services:
       - GPU_MONITORING_ENABLED=False
       # Enables self-hosted usage reporting + the license-validation thread.
       - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      # Audio limits — override in .env (see "Audio limits" in the README).
+      # Raising MAX_AUDIO_DURATION_MS beyond ~120 s usually also requires
+      # raising MAX_REQUEST_BYTES (the body cap: 40 MB fits ~120 s at 48 kHz
+      # stereo WAV) and INFERENCE_TIMEOUT_SECONDS (per-request deadline).
+      - MAX_AUDIO_DURATION_MS=${MAX_AUDIO_DURATION_MS:-120000}
+      - MIN_AUDIO_DURATION_MS=${MIN_AUDIO_DURATION_MS:-80}
+      - MAX_REQUEST_BYTES=${MAX_REQUEST_BYTES:-41943040}
+      - INFERENCE_TIMEOUT_SECONDS=${INFERENCE_TIMEOUT_SECONDS:-30}
       # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
       # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
       # image), crashing the engine. Disabling it is safe on supported GPUs too.
