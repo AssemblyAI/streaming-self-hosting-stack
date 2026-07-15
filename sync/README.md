@@ -64,8 +64,9 @@ curl -fsS http://localhost:8080/readyz
 an optional `config` JSON part. Accepted audio formats: **16-bit PCM WAV**
 (`audio/wav`) or **raw S16LE PCM** (`audio/pcm`, with `sample_rate` and
 `channels` in the config part) — compressed formats like MP3 are rejected
-with `415`. Audio constraints: 80 ms – 120 s, ≤ 40 MB, 16-bit, mono or
-stereo, sample rate one of `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
+with `415`. Audio constraints: 80 ms – 120 s and ≤ 40 MB by default (both
+configurable — see [Audio limits](#audio-limits)), 16-bit, mono or stereo,
+sample rate one of `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
@@ -79,6 +80,34 @@ The optional `config` part also accepts `language_code`, `prompt`,
 so double-check spelling if an option seems to have no effect. For transcription
 options and further help, see the [AssemblyAI documentation](https://www.assemblyai.com/docs)
 or reach out to your AssemblyAI contact.
+
+## Audio limits
+
+The accepted audio length and request size are controlled by environment
+variables on the `sync-api` container. The compose file passes them through, so
+set them in `.env` (defaults shown):
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `MAX_AUDIO_DURATION_MS` | `120000` | Longest accepted audio; longer requests return `413`. |
+| `MIN_AUDIO_DURATION_MS` | `80` | Shortest accepted audio; shorter requests return `400`. |
+| `MAX_REQUEST_BYTES` | `41943040` | Request-body cap; larger requests return `413`. |
+| `INFERENCE_TIMEOUT_SECONDS` | `30` | Per-request inference deadline; requests that exceed it return `504`. |
+
+When raising `MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
+
+- **`MAX_REQUEST_BYTES`** — the 40 MB default fits ~120 s of 48 kHz stereo WAV.
+  Size the cap to your longest audio at your highest sample rate / channel
+  count (`bytes ≈ seconds × sample_rate × channels × 2`, plus a small WAV
+  header).
+- **`INFERENCE_TIMEOUT_SECONDS`** — longer audio takes longer to transcribe,
+  especially under concurrent load; raise the deadline to keep long requests
+  from timing out.
+
+Longer audio also consumes proportionally more GPU KV cache while in flight,
+which lowers the request concurrency a container can sustain (see
+[Scaling](#sync-api-service)). Load-test at your chosen limit before relying on
+it in production.
 
 ## Running the sync example
 
