@@ -215,6 +215,148 @@ docker compose -f docker-compose.english-multilang.yml restart streaming-asr-mul
 docker compose -f docker-compose.universal-3-5-pro.yml restart streaming-asr-universal-3-5-pro
 ```
 
+## Deploying on Modal (serverless GPU)
+
+`modal_app.py` runs this stack on [Modal](https://modal.com). Compose's four
+services become three pieces:
+
+| Compose service | On Modal | Hardware |
+|---|---|---|
+| `streaming-api` | `streaming_api` function | CPU |
+| `license-and-usage-proxy` | `license_proxy` function | CPU |
+| `streaming-asr-universal-3-5-pro` | a **Sandbox** | L40S GPU |
+| `streaming-asr-lb` (nginx) | dropped | — |
+
+nginx only routes `X-Model-Version` across several ASR backends and balances
+replicas. With one model there is nothing to route.
+
+The ASR runs in a **Sandbox rather than a Function** because a Modal tunnel's
+lifetime is bound to the function *call*: a `@modal.web_server` body returns as
+soon as it has started its server, Modal tears down the call's tunnel, and the
+port stops answering while the container stays up. A Sandbox's tunnel lives as
+long as the Sandbox does.
+
+### Prerequisites
+
+Same Modal secrets as the [sync stack](../sync/README.md#store-credentials-as-modal-secrets)
+— `aai-ecr` and `aai-license`. Create them once; both stacks share them.
+
+### Deploy
+
+```bash
+modal run modal_app.py::start_asr    # boot the GPU backend (once)
+modal deploy modal_app.py            # the API + license proxy
+```
+
+`start_asr` creates the Sandbox, publishes its gRPC address into a
+`modal.Dict`, and prints it. The model needs a few minutes to warm; check it
+with `grpc_health_probe`, which ships in the image:
+
+```bash
+python -c "
+import modal
+d = modal.Dict.from_name('aai-streaming-asr-addr')
+sb = modal.Sandbox.from_id(d['sandbox_id'])
+p = sb.exec('grpc_health_probe', '-addr=:50051'); p.wait()
+print(p.stderr.read())"     # status: SERVING
+```
+
+Tear the backend down when you are done — **it holds a GPU for as long as it
+runs**:
+
+```bash
+modal run modal_app.py::stop_asr
+```
+
+### Verify
+
+```bash
+curl -fsS https://<workspace>--aai-streaming-u3pro-streaming-api.modal.run/v3/ws/health
+curl -fsS https://<workspace>--aai-streaming-u3pro-license-proxy.modal.run/v1/status
+```
+
+Then stream, using the [bundled example](#running-the-streaming-example) with
+`wss://` in place of `ws://localhost:8080`:
+
+```bash
+python example_with_prerecorded_audio_file.py \
+  --audio-file example_audio_file.wav \
+  --endpoint wss://<workspace>--aai-streaming-u3pro-streaming-api.modal.run \
+  --speech-model universal-3-5-pro
+```
+
+Or use the [load-test harness](../bench/README.md), which checks correctness
+and concurrency in one step:
+
+```bash
+cd ../bench && pip install -r requirements.txt
+python harness.py streaming \
+  --endpoint wss://<workspace>--aai-streaming-u3pro-streaming-api.modal.run \
+  --audio ../streaming/example/example_audio_file.wav \
+  --speech-model universal-3-5-pro --max-seconds 20
+```
+
+### Restarting the ASR invalidates the API
+
+`streaming_api` reads the ASR address from the `modal.Dict` **once, at container
+startup**, and passes it to the API process as `AAI_ASR_ENDPOINT`. A new Sandbox
+gets a new address, so warm API containers keep dialing the old one and every
+session fails with `3005 Session Cancelled` and, in the logs,
+`Bad connection. Missing expected server metadata keys`.
+
+After any `start_asr`, force fresh API containers:
+
+```bash
+modal app stop aai-streaming-u3pro -y && modal deploy modal_app.py
+```
+
+The startup log line confirms which address a container picked up:
+
+```
+[startup] ASR=r446.modal.host:39655 proxy=https://...
+```
+
+### Tear down
+
+The Sandbox holds an L40S for as long as it runs and does **not** scale to zero,
+so tear it down explicitly when you are finished:
+
+```bash
+modal run modal_app.py::stop_asr          # releases the GPU
+modal app stop aai-streaming-u3pro        # the API + license proxy
+modal app stop aai-streaming-asr          # the Sandbox's owning app
+```
+
+`stop_asr` also clears the address out of the `modal.Dict`, so a later
+`start_asr` starts clean.
+
+### Security
+
+`start_asr` exposes the ASR's gRPC port with `unencrypted_ports`, so it is a
+**plaintext TCP socket on the public internet carrying audio in the clear** —
+where compose keeps that hop on a private bridge network. This is acceptable for
+testing only. Before real traffic, either move the hop onto TLS
+(`encrypted_ports`, untested here) or run the API and ASR in one container so
+the hop stays on localhost. Note also that the API's own `.modal.run` URL is
+public and the service does not validate credentials beyond requiring a
+non-empty `Authorization` header.
+
+### Measured behaviour (single L40S)
+
+From `bench/harness.py` against 15 s clips, one Sandbox:
+
+| concurrent sessions | outcome |
+|---|---|
+| 4 – 40 | all succeeded, p50 steady at 18–25 s |
+| 64 | 7/64 failed |
+| 96 | 3/96 failed, 44× realtime aggregate |
+
+Roughly **40 concurrent realtime streams** per L40S with headroom. The failures
+at 64 were connection-level (`ConnectionClosedOK`, one bad HTTP response),
+consistent with the CPU API function still autoscaling rather than the GPU
+saturating — throughput was still climbing at 96, so the ASR itself was not the
+limit.
+
 ## Production deployment recommendations
 
 See the [top-level README](../README.md#production-recommendations-license-and-usage-proxy)
