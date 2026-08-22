@@ -35,14 +35,14 @@ Against a local compose stack, use `--endpoint http://localhost:8080` and
 
 ```bash
 python harness.py sync --endpoint https://... --audio a.wav --ramp 1,2,4,8,16
-python harness.py streaming --endpoint wss://... --audio a.wav --ramp 1,4,16,32 \
-  --max-seconds 20
+python harness.py streaming --endpoint wss://... --audio a.wav \
+  --ramp 1,4,16,32 --max-seconds 20
 ```
 
 Each level fires N requests simultaneously and reports:
 
 | column | meaning |
-|---|---|
+| --- | --- |
 | `ok` / `fail` | requests that returned a valid transcript |
 | `p50` / `p95` / `max` | per-request wall-clock latency |
 | `req/s` | completed requests per second |
@@ -54,11 +54,11 @@ past it, requests queue on the GPU rather than being served in parallel.
 ## Options
 
 | flag | purpose |
-|---|---|
+| --- | --- |
 | `--concurrency N` | single level (default 1) |
 | `--ramp a,b,c` | sweep several levels in order |
 | `--max-seconds N` | truncate the audio; keeps sweeps short |
-| `--expect WORD` | substring the transcript must contain (`--expect ''` disables) |
+| `--expect WORD` | substring the transcript must contain; `''` disables |
 | `--speech-model` | streaming only, e.g. `universal-3-5-pro` |
 | `--speed N` | streaming send rate vs realtime; `2` sends twice as fast |
 | `--open-timeout N` | WebSocket handshake wait, default 300s for cold starts |

@@ -199,7 +199,17 @@ curl -sS -o /dev/null -w '%{http_code}\n' \
 # 303 while the container is cold, 200 once the model is warm
 ```
 
-Then transcribe exactly as documented in [Transcribe](#transcribe), swapping
+The [load-test harness](../bench/README.md) checks correctness and concurrency
+in one step:
+
+```bash
+cd ../bench && pip install -r requirements.txt
+python harness.py sync \
+  --endpoint https://<workspace>--aai-sync-u3pro-sync-api.modal.run \
+  --audio ../sync/example/example_audio_file.wav
+```
+
+Or transcribe exactly as documented in [Transcribe](#transcribe), swapping
 `http://localhost:8080` for the `sync-api` URL:
 
 ```bash
@@ -208,6 +218,36 @@ curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
   -H 'Authorization: any value works' \
   https://<workspace>--aai-sync-u3pro-sync-api.modal.run/transcribe
 ```
+
+### Tear down
+
+Both functions scale to zero on their own, so an idle deployment holds no GPU.
+To remove it entirely:
+
+```bash
+modal app stop aai-sync-u3pro
+```
+
+### Measured behaviour (single L40S)
+
+From `bench/harness.py` against the bundled 60 s sample, one warm container:
+
+| concurrent requests | ok | p50 | p95 | audio x realtime |
+|---:|---:|---:|---:|---:|
+| 1 | 1/1 | 2.60 s | 2.60 s | 22.6 |
+| 2 | 2/2 | 4.41 s | 4.41 s | 27.2 |
+| 4 | 4/4 | 6.15 s | 7.88 s | 30.5 |
+| 8 | 8/8 | 9.43 s | 14.57 s | 33.0 |
+| 16 | 16/16 | 16.73 s | 28.85 s | 33.3 |
+
+Server-side inference was ~1.8–2.1 s for 60 s of audio. Throughput plateaus
+near **33x realtime at concurrency 8**; past that, latency grows roughly
+linearly while throughput does not, which is the point where requests queue on
+the GPU. Size a replica against that knee.
+
+Note the first request after idle is a cold start, not a latency measurement —
+one measured 168 s wall against 1.8 s of server time. A burst shorter than a
+cold start also will not autoscale, so a sweep measures a single container.
 
 ### Modal-specific notes
 

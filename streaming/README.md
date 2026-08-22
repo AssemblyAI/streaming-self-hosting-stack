@@ -285,8 +285,16 @@ python example_with_prerecorded_audio_file.py \
   --speech-model universal-3-5-pro
 ```
 
-Or use the [load-test harness](../bench/README.md), which also measures
-concurrency.
+Or use the [load-test harness](../bench/README.md), which checks correctness
+and concurrency in one step:
+
+```bash
+cd ../bench && pip install -r requirements.txt
+python harness.py streaming \
+  --endpoint wss://<workspace>--aai-streaming-u3pro-streaming-api.modal.run \
+  --audio ../streaming/example/example_audio_file.wav \
+  --speech-model universal-3-5-pro --max-seconds 20
+```
 
 ### Restarting the ASR invalidates the API
 
@@ -307,6 +315,20 @@ The startup log line confirms which address a container picked up:
 ```
 [startup] ASR=r446.modal.host:39655 proxy=https://...
 ```
+
+### Tear down
+
+The Sandbox holds an L40S for as long as it runs and does **not** scale to zero,
+so tear it down explicitly when you are finished:
+
+```bash
+modal run modal_app.py::stop_asr          # releases the GPU
+modal app stop aai-streaming-u3pro        # the API + license proxy
+modal app stop aai-streaming-asr          # the Sandbox's owning app
+```
+
+`stop_asr` also clears the address out of the `modal.Dict`, so a later
+`start_asr` starts clean.
 
 ### Security
 
