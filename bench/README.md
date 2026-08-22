@@ -61,10 +61,18 @@ past it, requests queue on the GPU rather than being served in parallel.
 | `--expect WORD` | substring the transcript must contain; `''` disables |
 | `--speech-model` | streaming only, e.g. `universal-3-5-pro` |
 | `--speed N` | streaming send rate vs realtime; `2` sends twice as fast |
+| `--show-transcript` | print a sample transcript; off by default (see below) |
 | `--open-timeout N` | WebSocket handshake wait, default 300s for cold starts |
 | `--stop-on-failure` | end a ramp at the first level that fails |
 
 Exit status is non-zero if any level had a failure, so it works as a CI gate.
+
+Transcripts are not printed by default. They are produced from whatever audio
+you submit and can contain personal data, which you generally do not want in CI
+logs. Correctness is still enforced without them: `--expect` fails the run if
+the expected substring is missing, and the summary reports word and character
+counts. Pass `--show-transcript` when you want to eyeball the text — it is
+truncated and newline-collapsed so untrusted output cannot forge log lines.
 
 ## Interpreting Modal results
 

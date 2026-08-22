@@ -251,6 +251,11 @@ def main() -> int:
         "--speed", type=float, default=1.0, help="streaming send rate vs realtime"
     )
     ap.add_argument(
+        "--show-transcript",
+        action="store_true",
+        help="print a sample transcript; off by default since audio may contain personal data",
+    )
+    ap.add_argument(
         "--open-timeout",
         type=float,
         default=300.0,
@@ -295,7 +300,20 @@ def main() -> int:
         if not sample_shown:
             first_ok = next((r for r in results if r.ok), None)
             if first_ok:
-                print(f"\ntranscript: {first_ok.text[:160]}...")
+                # Transcripts are user audio and can carry personal data, so the
+                # default output describes the result without reproducing it.
+                # Correctness is already asserted by --expect; this is only a
+                # human sanity check, so it is opt-in.
+                if args.show_transcript:
+                    # Collapse newlines: transcript text is untrusted input and
+                    # must not be able to forge extra log lines.
+                    sample = " ".join(first_ok.text.split())[:160]
+                    print(f"\ntranscript: {sample}...")
+                else:
+                    print(
+                        f"\ntranscript: {len(first_ok.text)} chars "
+                        f"(hidden; pass --show-transcript to print it)"
+                    )
                 if first_ok.extra:
                     print(f"detail: {first_ok.extra}")
                 sample_shown = True
