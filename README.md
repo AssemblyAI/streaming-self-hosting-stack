@@ -23,6 +23,12 @@ Each service directory is self-contained: its compose file(s), `.env.example`,
 example client, and `README.md` live together. Run commands from inside the
 service directory.
 
+Both stacks can also run on serverless GPUs instead of hardware you manage — see
+[sync on Modal](sync/README.md#deploying-on-modal-serverless-gpu) and
+[streaming on Modal](streaming/README.md#deploying-on-modal-serverless-gpu).
+[`bench/`](bench/) holds a load-test harness that points at either deployment
+with real audio and measures the concurrency it sustains.
+
 ## Repository layout
 
 ```

@@ -121,6 +121,117 @@ python transcribe_file.py                    # uses the bundled example_audio_fi
 python transcribe_file.py path/to/audio.wav  # or your own 16-bit PCM WAV
 ```
 
+## Deploying on Modal (serverless GPU)
+
+`modal_app.py` runs this same stack on [Modal](https://modal.com) instead of a
+GPU box you manage. Compose's two services become two Modal functions, because
+Modal runs one image per container and has no sidecars:
+
+| Compose service | Modal function | Hardware |
+|---|---|---|
+| `sync-api` | `sync_api` | L40S GPU |
+| `license-and-usage-proxy` | `license_proxy` | CPU |
+
+`sync_api` resolves the proxy's Modal URL at startup and passes it as
+`LICENSE_AND_USAGE_PROXY_ENDPOINT`, replacing the compose bridge network.
+
+### Prerequisites
+
+```bash
+pip install modal && modal setup   # authenticate the Modal CLI
+```
+
+### Store credentials as Modal secrets
+
+Modal has no bind mounts, so the license travels as a secret and is written to
+disk at container startup. Both secrets are read at image-build and run time:
+
+```bash
+# ECR pull credentials. Modal re-mints the 12-hour registry token from these.
+modal secret create aai-ecr \
+  AWS_ACCESS_KEY_ID="$(aws configure get aws_access_key_id)" \
+  AWS_SECRET_ACCESS_KEY="$(aws configure get aws_secret_access_key)" \
+  AWS_REGION=us-west-2
+
+# The license itself, kept out of any image layer.
+modal secret create aai-license AAI_LICENSE_JWT="$(cat license.jwt)"
+```
+
+If you authenticate with `aws login` or SSO rather than static keys, export the
+temporary session credentials instead — note they expire, so image *rebuilds*
+need a refresh (deploys of an already-built image do not):
+
+```bash
+eval "$(aws configure export-credentials --format env)"
+modal secret create aai-ecr \
+  AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  AWS_SESSION_TOKEN="$AWS_SESSION_TOKEN" \
+  AWS_REGION=us-west-2 --force
+```
+
+Usage-based licenses also need `USAGE_TRACKING_API_KEY` added to `aai-license`
+and passed through in `license_proxy`. Flat-billed licenses need nothing extra.
+
+### Deploy
+
+```bash
+modal deploy modal_app.py
+```
+
+The first deploy pulls and converts the ~13.5 GB sync image and takes several
+minutes; later deploys reuse the cached image and take seconds. Two public URLs
+are printed:
+
+```
+https://<workspace>--aai-sync-u3pro-sync-api.modal.run
+https://<workspace>--aai-sync-u3pro-license-proxy.modal.run
+```
+
+### Verify
+
+```bash
+curl -fsS https://<workspace>--aai-sync-u3pro-license-proxy.modal.run/v1/status
+# {"state":"Connected", ...}
+
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  https://<workspace>--aai-sync-u3pro-sync-api.modal.run/readyz
+# 303 while the container is cold, 200 once the model is warm
+```
+
+Then transcribe exactly as documented in [Transcribe](#transcribe), swapping
+`http://localhost:8080` for the `sync-api` URL:
+
+```bash
+curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
+  -F 'config={"language_code":"en"};type=application/json' \
+  -H 'Authorization: any value works' \
+  https://<workspace>--aai-sync-u3pro-sync-api.modal.run/transcribe
+```
+
+### Modal-specific notes
+
+- **Cold starts.** A cold `sync_api` container spends roughly 2–4 minutes
+  pulling the image, loading weights, and capturing CUDA graphs; Modal returns
+  `303` until the server binds. `scaledown_window=300` keeps a warm container
+  for 5 minutes after the last request. For latency-sensitive traffic set
+  `min_containers=1` on `sync_api` — that holds a GPU and bills accordingly.
+- **`.entrypoint([])` is required.** Modal prepends an image's `ENTRYPOINT` to
+  its own runtime command. Left in place, the vendor binary swallows Modal's
+  arguments, starts with default environment (so `LICENSE_FILE_PATH` reverts to
+  the compose path and the proxy dies with `License file not found`), and the
+  Python in `modal_app.py` never executes.
+- **Interpreter handling differs per image.** The proxy (Wolfi) already exposes
+  `python3`, so it must *not* get `add_python`. The sync image's interpreter is
+  hermetic inside Bazel runfiles and invisible to Modal, so it needs
+  `add_python="3.12"`. Both images additionally pip-install the Modal client,
+  because Modal's runtime-mounted client dependencies do not land on these
+  interpreters' `sys.path` (symptom: `ModuleNotFoundError: grpclib`).
+- **Authentication.** As on any other host, the service does not validate
+  credentials but rejects an empty `Authorization` header with `401`. A
+  `.modal.run` URL is public — put auth in front of it, or deploy the endpoint
+  with Modal proxy auth, before exposing it beyond testing.
+
 ## Production deployment recommendations
 
 See the [top-level README](../README.md#production-recommendations-license-and-usage-proxy)

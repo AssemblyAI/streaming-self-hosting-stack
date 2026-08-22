@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+
+# Local secrets / config (see README)
+.env
+license.jwt
+*.jwt
+.ruff_cache/
