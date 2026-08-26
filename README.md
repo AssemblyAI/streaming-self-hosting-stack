@@ -23,6 +23,11 @@ Each service directory is self-contained: its compose file(s), `.env.example`,
 example client, and `README.md` live together. Run commands from inside the
 service directory.
 
+Each stack can also run on serverless GPUs instead of hardware you manage. Every
+stack is a self-contained Modal App deployed with a single `modal deploy` — see
+[sync on Modal](sync/README.md#deploying-on-modal-serverless-gpu) and
+[streaming on Modal](streaming/README.md#deploying-on-modal-serverless-gpu).
+
 ## Repository layout
 
 ```

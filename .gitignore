@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.env
+license.jwt
+*.jwt
+.ruff_cache/
