@@ -83,13 +83,13 @@ def stream_once(args, pcm: bytes, rate: int, live: bool) -> dict:
                     if first_turn is None:
                         first_turn = time.perf_counter() - start
                     text = " ".join(w["text"] for w in words)
-                    if live:
-                        # Update the current line for partials; commit a line on finalize.
-                        if data.get("end_of_turn"):
+                    if data.get("end_of_turn"):
+                        finals.append(text)
+                        if live:
                             print(f"\r  ✓ {text}", flush=True)
-                            finals.append(text)
-                        else:
-                            print(f"\r  … {text[:110]}", end="", flush=True)
+                    elif live:
+                        # Update the current line in place while the turn forms.
+                        print(f"\r  … {text[:110]}", end="", flush=True)
                 elif data.get("type") == "Termination":
                     break
             wf.result()
