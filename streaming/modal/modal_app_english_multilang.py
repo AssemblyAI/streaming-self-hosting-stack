@@ -54,7 +54,7 @@ app = modal.App(APP_NAME)
 
 
 def _vendor_image(repo: str, tag: str) -> modal.Image:
-    """A Modal-runnable image from an AssemblyAI ECR image (see sync_modal_stack/modal_app.py)."""
+    """A Modal-runnable image from an AssemblyAI ECR image (see sync/modal/modal_app.py)."""
     return (
         modal.Image.from_aws_ecr(
             f"{REGISTRY}/{repo}:{tag}", secret=ecr_secret, add_python="3.12"
@@ -83,7 +83,7 @@ _stopping = threading.Event()
 
 
 def _launch(argv: list[str], env: dict[str, str]) -> subprocess.Popen:
-    """Start a binary and fate-share it with the container (see sync_modal_stack/modal_app.py)."""
+    """Start a binary and fate-share it with the container (see sync/modal/modal_app.py)."""
     proc = subprocess.Popen(argv, env={**os.environ, **env})
 
     def _reap() -> None:

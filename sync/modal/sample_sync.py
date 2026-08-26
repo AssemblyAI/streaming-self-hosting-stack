@@ -3,7 +3,7 @@
 
     pip install requests
     python sample_sync.py --endpoint https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct \
-        --audio ../sync/example/example_audio_file.wav
+        --audio ../docker/example/example_audio_file.wav
 
 Load test (fire N in parallel, watch throughput):
     python sample_sync.py --endpoint https://... --audio a.wav --concurrency 8

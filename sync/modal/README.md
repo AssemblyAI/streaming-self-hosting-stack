@@ -4,7 +4,7 @@
 [Modal](https://modal.com) instead of a GPU box you manage. It is a
 self-contained Modal App: one `modal deploy` brings up both services and wires
 them together, and nothing depends on another deployment. Compose's two services
-(see [`../sync/`](../sync/)) become two Modal Servers:
+(see [`../docker/`](../docker/)) become two Modal Servers:
 
 | Compose service | Modal Server | Hardware |
 |---|---|---|
@@ -71,7 +71,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' \
   https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct/readyz
 # 503 while the model is cold, 200 once warm (Modal's edge may answer 303 first)
 
-curl -F 'audio=@../sync/example/example_audio_file.wav;type=audio/wav' \
+curl -F 'audio=@../docker/example/example_audio_file.wav;type=audio/wav' \
   -F 'config={"language_code":"en"};type=application/json' \
   -H "Modal-Key: $MODAL_KEY" -H "Modal-Secret: $MODAL_SECRET" \
   -H 'Authorization: any-non-empty-value' \
@@ -108,7 +108,7 @@ and word count; `--concurrency N` fires N at once for a quick load check.
 pip install requests
 python sample_sync.py \
   --endpoint https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct \
-  --audio ../sync/example/example_audio_file.wav
+  --audio ../docker/example/example_audio_file.wav
 ```
 
 If the stack was deployed with the default proxy auth, pass `--modal-key` /

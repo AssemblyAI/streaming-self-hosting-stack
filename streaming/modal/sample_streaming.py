@@ -5,12 +5,12 @@
     # Universal-3.5 Pro stack:
     python sample_streaming.py \
         --endpoint wss://<workspace>--aai-streaming-u3pro-streamingapi.<region>.modal.direct \
-        --audio ../streaming/example/example_audio_file.wav \
+        --audio ../docker/example/example_audio_file.wav \
         --speech-model universal-3-5-pro
 
     # English + Multilingual stack (pick the model):
     python sample_streaming.py --endpoint wss://<workspace>--aai-streaming-english-multilang-streamingapi.<region>.modal.direct \
-        --audio ../streaming/example/example_audio_file.wav --speech-model universal-streaming-english
+        --audio ../docker/example/example_audio_file.wav --speech-model universal-streaming-english
     #   ... or --speech-model universal-streaming-multilingual
 
 Audio is sent at real time by default so you watch partial turns update and

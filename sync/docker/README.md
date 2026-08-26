@@ -6,7 +6,7 @@ directory.
 
 > Prerequisites (license, Docker, GPU runtime, ECR auth) and the shared
 > license-and-usage-proxy (usage reporting, license status endpoint, proxy
-> production recommendations) are documented in the [top-level README](../README.md).
+> production recommendations) are documented in the [top-level README](../../README.md).
 
 The stack (`docker-compose.universal-3-5-pro.yml`) runs two containers — `sync-api`
 (GPU) and `license-and-usage-proxy` — with no nginx load balancer and no
@@ -22,7 +22,7 @@ header returns `401`, so make sure your proxy doesn't strip it.
 
 ## Setup
 
-Complete the [shared prerequisites](../README.md#prerequisites-all-services)
+Complete the [shared prerequisites](../../README.md#prerequisites-all-services)
 (GPU runtime, ECR authentication, license file) first, then configure images:
 
 ```bash
@@ -124,11 +124,11 @@ python transcribe_file.py path/to/audio.wav  # or your own 16-bit PCM WAV
 ## Deploying on Modal (serverless GPU)
 
 This stack also runs on Modal's serverless GPUs as a self-contained,
-single-`modal deploy` Modal App. See [`../sync_modal_stack/`](../sync_modal_stack/).
+single-`modal deploy` Modal App. See [`../modal/`](../modal/).
 
 ## Production deployment recommendations
 
-See the [top-level README](../README.md#production-recommendations-license-and-usage-proxy)
+See the [top-level README](../../README.md#production-recommendations-license-and-usage-proxy)
 for the license-and-usage-proxy.
 
 ### sync-api service

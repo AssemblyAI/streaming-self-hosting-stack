@@ -3,7 +3,7 @@
 Each streaming stack runs on [Modal](https://modal.com) as a self-contained
 Modal App: one `modal deploy` brings up every service and wires them together,
 with no dependency on any other deployment. Compose equivalents live in
-[`../streaming/`](../streaming/).
+[`../docker/`](../docker/).
 
 | Stack | File | Servers |
 |---|---|---|
@@ -19,7 +19,7 @@ the matching backend, exactly as `streaming-asr-lb` does in compose.
 
 ## Prerequisites and secrets
 
-Identical to the [sync stack](../sync_modal_stack/README.md#store-credentials-as-modal-secrets):
+Identical to the [sync stack](../../sync/modal/README.md#store-credentials-as-modal-secrets):
 create the `aai-ecr-credentials` and `aai-license` Modal secrets once; all three
 stacks share them.
 
@@ -51,7 +51,7 @@ curl -fsS https://<workspace>--aai-streaming-u3pro-licenseproxy.<region>.modal.d
 # against an AAI_REQUIRE_MODAL_AUTH=0 endpoint):
 python sample_streaming.py \
   --endpoint wss://<workspace>--aai-streaming-u3pro-streamingapi.<region>.modal.direct \
-  --audio ../streaming/example/example_audio_file.wav \
+  --audio ../docker/example/example_audio_file.wav \
   --speech-model universal-3-5-pro \
   --modal-key "$MODAL_KEY" --modal-secret "$MODAL_SECRET"
 ```
@@ -93,7 +93,7 @@ opens N concurrent sessions.
 pip install websockets
 python sample_streaming.py \
   --endpoint wss://<workspace>--aai-streaming-u3pro-streamingapi.<region>.modal.direct \
-  --audio ../streaming/example/example_audio_file.wav \
+  --audio ../docker/example/example_audio_file.wav \
   --speech-model universal-3-5-pro
 ```
 
