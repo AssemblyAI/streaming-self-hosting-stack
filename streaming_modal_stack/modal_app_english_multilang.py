@@ -69,11 +69,10 @@ multilang_image = _vendor_image("self-hosted-streaming-asr-multilang", ASR_MODEL
 api_image = _vendor_image("self-hosted-streaming-api", API_TAG)
 proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy", PROXY_TAG)
 # nginx routes gRPC by x-model-version; no ECR pull needed. A Debian base gives
-# Modal a detectable interpreter plus its client, alongside nginx; ca-certificates
-# lets nginx verify the ASR backends' TLS certs (grpc_ssl_verify below).
+# Modal a detectable interpreter plus its client, alongside nginx.
 lb_image = (
     modal.Image.debian_slim(python_version="3.12")
-    .apt_install("nginx", "ca-certificates")
+    .apt_install("nginx")
     .pip_install(f"modal=={modal.__version__}")
 )
 
@@ -241,10 +240,13 @@ http {{
     location / {{
       grpc_pass grpcs://$asr_backend;
       grpc_ssl_server_name on;
-      # Authenticate the backend, not just encrypt: verify its TLS cert against
-      # the public CA store (Modal's edge presents a publicly-trusted cert).
-      grpc_ssl_verify on;
-      grpc_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+      # This encrypts the LB->ASR hop but does not authenticate the backend:
+      # grpc_ssl_verify is left off because nginx cannot build a chain to Modal's
+      # edge certificate here (grpc_ssl_verify on fails with "unable to get local
+      # issuer certificate" and takes the backend down). The backend is
+      # unauthenticated by design anyway (see README "Authentication and
+      # security"); co-locate the API and ASR, or use i6pn, to remove the public
+      # hop entirely rather than only encrypt it.
       grpc_connect_timeout 75s;
       grpc_read_timeout 10h;
       grpc_send_timeout 10h;
