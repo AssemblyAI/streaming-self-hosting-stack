@@ -56,21 +56,29 @@ printed, of the form `https://<workspace>--aai-sync-u3pro-<server>.<region>.moda
 
 ## Verify
 
+`syncapi` is behind Modal proxy auth by default, so its probes need a
+`Modal-Key` / `Modal-Secret` header pair (a proxy-auth token from the Modal
+dashboard); `licenseproxy` `/v1/status` needs none. The `syncapi` examples below
+show those headers — omit them only against an endpoint deployed with
+`AAI_REQUIRE_MODAL_AUTH=0`, where any non-empty `Authorization` connects.
+
 ```bash
 curl -fsS https://<workspace>--aai-sync-u3pro-licenseproxy.<region>.modal.direct/v1/status
 # {"state":"Connected", ...}
 
 curl -sS -o /dev/null -w '%{http_code}\n' \
+  -H "Modal-Key: $MODAL_KEY" -H "Modal-Secret: $MODAL_SECRET" \
   https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct/readyz
 # 503 while the model is cold, 200 once warm (Modal's edge may answer 303 first)
 
 curl -F 'audio=@../sync/example/example_audio_file.wav;type=audio/wav' \
   -F 'config={"language_code":"en"};type=application/json' \
+  -H "Modal-Key: $MODAL_KEY" -H "Modal-Secret: $MODAL_SECRET" \
   -H 'Authorization: any-non-empty-value' \
   https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct/transcribe
 ```
 
-Or use the [sample script](#sample-requests).
+Or use the [sample script](#sample-requests) (pass `--modal-key` / `--modal-secret`).
 
 ## Authentication
 

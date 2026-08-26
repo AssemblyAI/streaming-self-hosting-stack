@@ -31,21 +31,29 @@ modal deploy modal_app_universal_3_5_pro.py     # or modal_app_english_multilang
 
 Each GPU backend keeps one L40S warm (`min_containers=1`) and gates readiness on
 `grpc_health_probe`, so the first deploy takes a few minutes to warm the model;
-Modal then autoscales on concurrent sessions (`target_concurrency=32`, matching
-`MAX_OPEN_STREAMS`). The endpoint URLs are printed, of the form
+Modal then autoscales on concurrent sessions, with `target_concurrency` set to
+each stack's `MAX_OPEN_STREAMS` (Universal-3.5 Pro 32, English + Multilingual 48,
+matching compose). The endpoint URLs are printed, of the form
 `https://<workspace>--<app>-streamingapi.<region>.modal.direct`.
 
 ## Verify
 
+The `streamingapi` endpoint is behind Modal proxy auth by default, so send a
+proxy-auth token (`--modal-key` / `--modal-secret`, or `MODAL_KEY` /
+`MODAL_SECRET`); a `licenseproxy` `/v1/status` check needs none. To probe
+without a token, deploy the endpoint with `AAI_REQUIRE_MODAL_AUTH=0`.
+
 ```bash
 curl -fsS https://<workspace>--aai-streaming-u3pro-licenseproxy.<region>.modal.direct/v1/status
-curl -fsS https://<workspace>--aai-streaming-u3pro-streamingapi.<region>.modal.direct/v3/ws/health
 
-# Stream with the bundled example client, swapping ws://localhost:8080 for the wss:// URL:
-python ../streaming/example/example_with_prerecorded_audio_file.py \
-  --audio-file ../streaming/example/example_audio_file.wav \
+# Stream with the bundled sample client (it forwards Modal proxy-auth headers;
+# the repo's example_with_prerecorded_audio_file.py does not, so it only works
+# against an AAI_REQUIRE_MODAL_AUTH=0 endpoint):
+python sample_streaming.py \
   --endpoint wss://<workspace>--aai-streaming-u3pro-streamingapi.<region>.modal.direct \
-  --speech-model universal-3-5-pro
+  --audio ../streaming/example/example_audio_file.wav \
+  --speech-model universal-3-5-pro \
+  --modal-key "$MODAL_KEY" --modal-secret "$MODAL_SECRET"
 ```
 
 For the English + Multilingual stack use `--speech-model universal-streaming-english`

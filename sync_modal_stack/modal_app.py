@@ -19,6 +19,7 @@ Prerequisites (see README "Deploying on Modal"):
 import os
 import signal
 import subprocess
+import threading
 
 import modal
 
@@ -67,6 +68,11 @@ proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy")
 sync_image = _vendor_image("self-hosted-sync-asr-u3-pro")
 
 
+# Set by each @modal.exit stop() so the fate-share reaper can tell an intentional
+# teardown from an unexpected vendor exit (one server per container).
+_stopping = threading.Event()
+
+
 def _launch(argv: list[str], env: dict[str, str]) -> subprocess.Popen:
     """Start a vendor binary and fate-share it with the container.
 
@@ -76,11 +82,14 @@ def _launch(argv: list[str], env: dict[str, str]) -> subprocess.Popen:
     """
     proc = subprocess.Popen(argv, env={**os.environ, **env})
 
-    import threading
-
     def _reap() -> None:
         proc.wait()
-        os._exit(proc.returncode or 1)
+        # An exit while we are not intentionally stopping means the vendor
+        # process died on its own; fail so Modal replaces the container. A clean
+        # @modal.exit teardown sets _stopping first, so stay quiet and let the
+        # exit handler finish (the container then exits 0).
+        if not _stopping.is_set():
+            os._exit(proc.returncode if (proc.returncode or 0) > 0 else 1)
 
     threading.Thread(target=_reap, daemon=True).start()
     return proc
@@ -143,6 +152,7 @@ class LicenseProxy:
     @modal.exit()
     def stop(self) -> None:
         # Graceful stop lets the proxy flush queued usage before exit.
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=25)
@@ -199,6 +209,7 @@ class SyncApi:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=50)

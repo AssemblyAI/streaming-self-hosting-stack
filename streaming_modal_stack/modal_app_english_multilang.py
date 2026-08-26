@@ -23,14 +23,18 @@ Tear down: modal app stop aai-streaming-english-multilang
 import os
 import signal
 import subprocess
+import threading
 
 import modal
 
 APP_NAME = "aai-streaming-english-multilang"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-# The English/Multilingual images ship on their own release line, separate from
-# the Universal-3.5 Pro images (see streaming/.env.example).
-TAG = "release-v0.6.0"
+# The English/Multilingual ASR images ship on their own release line, separate
+# from the shared streaming-api and license-and-usage-proxy images.
+ASR_MODEL_TAG = "release-v0.6.0"
+# streaming-api carries the WARNING-not-ERROR handshake-logging fix at v1.0.1
+# (DeepLearning #19523); the license-and-usage-proxy has no v1.0.1.
+API_TAG = "release-v1.0.1"
 PROXY_TAG = "release-v1.0.0"
 ASR_GRPC_PORT = 50051
 
@@ -60,28 +64,37 @@ def _vendor_image(repo: str, tag: str) -> modal.Image:
     )
 
 
-english_image = _vendor_image("self-hosted-streaming-asr-english", TAG)
-multilang_image = _vendor_image("self-hosted-streaming-asr-multilang", TAG)
-api_image = _vendor_image("self-hosted-streaming-api", PROXY_TAG)
+english_image = _vendor_image("self-hosted-streaming-asr-english", ASR_MODEL_TAG)
+multilang_image = _vendor_image("self-hosted-streaming-asr-multilang", ASR_MODEL_TAG)
+api_image = _vendor_image("self-hosted-streaming-api", API_TAG)
 proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy", PROXY_TAG)
 # nginx routes gRPC by x-model-version; no ECR pull needed. A Debian base gives
-# Modal a detectable interpreter plus its client, alongside nginx.
+# Modal a detectable interpreter plus its client, alongside nginx; ca-certificates
+# lets nginx verify the ASR backends' TLS certs (grpc_ssl_verify below).
 lb_image = (
     modal.Image.debian_slim(python_version="3.12")
-    .apt_install("nginx")
+    .apt_install("nginx", "ca-certificates")
     .pip_install(f"modal=={modal.__version__}")
 )
+
+
+# Set by each @modal.exit stop() so the fate-share reaper can tell an intentional
+# teardown from an unexpected vendor exit (one server per container).
+_stopping = threading.Event()
 
 
 def _launch(argv: list[str], env: dict[str, str]) -> subprocess.Popen:
     """Start a binary and fate-share it with the container (see sync_modal_stack/modal_app.py)."""
     proc = subprocess.Popen(argv, env={**os.environ, **env})
 
-    import threading
-
     def _reap() -> None:
         proc.wait()
-        os._exit(proc.returncode or 1)
+        # An exit while we are not intentionally stopping means the vendor
+        # process died on its own; fail so Modal replaces the container. A clean
+        # @modal.exit teardown sets _stopping first, so stay quiet and let the
+        # exit handler finish (the container then exits 0).
+        if not _stopping.is_set():
+            os._exit(proc.returncode if (proc.returncode or 0) > 0 else 1)
 
     threading.Thread(target=_reap, daemon=True).start()
     return proc
@@ -125,7 +138,7 @@ _ASR_KW = dict(
     port=ASR_GRPC_PORT,
     h2_enabled=True,
     unauthenticated=True,  # dialed server-side (via nginx) over gRPC; see README "Security"
-    target_concurrency=32,
+    target_concurrency=48,  # matches MAX_OPEN_STREAMS=48 (compose parity)
     min_containers=1,
     max_containers=4,
     buffer_containers=1,
@@ -137,7 +150,7 @@ _ASR_ENV = {
     "SERVER_PORT": str(ASR_GRPC_PORT),
     "LOGGING_LEVEL": "INFO",
     "USE_STRUCTURED_LOGGING": "False",
-    "MAX_OPEN_STREAMS": os.environ.get("MAX_OPEN_STREAMS", "32"),
+    "MAX_OPEN_STREAMS": os.environ.get("MAX_OPEN_STREAMS", "48"),
     "VLLM_USE_FLASHINFER_SAMPLER": "0",
 }
 
@@ -158,6 +171,7 @@ class LicenseProxy:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=25)
@@ -174,6 +188,7 @@ class AsrEnglish:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=570)
@@ -190,6 +205,7 @@ class AsrMultilang:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=570)
@@ -225,6 +241,10 @@ http {{
     location / {{
       grpc_pass grpcs://$asr_backend;
       grpc_ssl_server_name on;
+      # Authenticate the backend, not just encrypt: verify its TLS cert against
+      # the public CA store (Modal's edge presents a publicly-trusted cert).
+      grpc_ssl_verify on;
+      grpc_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
       grpc_connect_timeout 75s;
       grpc_read_timeout 10h;
       grpc_send_timeout 10h;
@@ -251,6 +271,7 @@ class Lb:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=25)
@@ -289,6 +310,7 @@ class StreamingApi:
 
     @modal.exit()
     def stop(self) -> None:
+        _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
             self.proc.wait(timeout=570)

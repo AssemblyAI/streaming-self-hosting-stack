@@ -170,9 +170,10 @@ upgrading from the v0.6.0 U3 Pro stack:
 
 #### Images
 
-`release-v1.0.0` is published for `self-hosted-streaming-api`,
-`self-hosted-streaming-license-and-usage-proxy`,
-`self-hosted-streaming-asr-universal-3-5-pro`, and `self-hosted-sync-asr-u3-pro`.
+`release-v1.0.1` is published for `self-hosted-streaming-api` (adds the
+peer-aborted-handshake logging fix) and `self-hosted-streaming-asr-universal-3-5-pro`;
+`release-v1.0.0` for `self-hosted-streaming-license-and-usage-proxy` and
+`self-hosted-sync-asr-u3-pro`.
 The English and Multilingual ASR images are unchanged since v0.6.0 — keep
 `STREAMING_ASR_ENGLISH_IMAGE` and `STREAMING_ASR_MULTILANG_IMAGE` at
 `release-v0.6.0` (see `streaming/.env.example`).

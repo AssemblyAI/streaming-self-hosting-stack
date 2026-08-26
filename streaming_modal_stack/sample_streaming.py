@@ -119,9 +119,13 @@ def main() -> int:
     print(f"{args.endpoint}\n  audio {dur:.1f}s @ {rate} Hz | model={args.speech_model or '(default)'} | "
           f"speed={args.speed}x | sessions={args.load}\n")
 
+    def _first_turn(r: dict) -> str:
+        # None when the session produced no word-bearing turns.
+        return f"{r['first_turn_s']:.2f}s" if r["first_turn_s"] is not None else "n/a"
+
     if args.load == 1:
         r = stream_once(args, pcm, rate, live=True)
-        print(f"\n{r['turns']} final turns | first turn {r['first_turn_s']:.2f}s | wall {r['elapsed_s']:.1f}s")
+        print(f"\n{r['turns']} final turns | first turn {_first_turn(r)} | wall {r['elapsed_s']:.1f}s")
         return 0
 
     # Load mode: run N sessions at once, print a summary line per session.
@@ -134,7 +138,7 @@ def main() -> int:
             try:
                 r = fut.result()
                 ok += 1
-                print(f"  session {i:>2}: ok | {r['turns']} turns | first turn {r['first_turn_s']:.2f}s")
+                print(f"  session {i:>2}: ok | {r['turns']} turns | first turn {_first_turn(r)}")
             except Exception as exc:  # noqa: BLE001
                 print(f"  session {i:>2}: FAIL {exc}")
     print(f"\n{ok}/{args.load} sessions ok | wall {time.perf_counter() - started:.1f}s")
