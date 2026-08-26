@@ -29,7 +29,12 @@ import modal
 
 APP_NAME = "aai-streaming-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-TAG = "release-v1.0.0"
+# streaming-api and the u3-5-pro ASR ship on release-v1.0.1 (the API image
+# carries the WARNING-not-ERROR handshake-logging fix, DeepLearning #19523);
+# the license-and-usage-proxy has no v1.0.1 and stays on v1.0.0.
+API_TAG = "release-v1.0.1"
+ASR_TAG = "release-v1.0.1"
+PROXY_TAG = "release-v1.0.0"
 ASR_GRPC_PORT = 50051
 
 # See sync_modal_stack/modal_app.py: the WebSocket API requires a Modal proxy-auth token by
@@ -48,20 +53,20 @@ license_secret = modal.Secret.from_name("aai-license")
 app = modal.App(APP_NAME)
 
 
-def _vendor_image(repo: str) -> modal.Image:
+def _vendor_image(repo: str, tag: str) -> modal.Image:
     """A Modal-runnable image from an AssemblyAI ECR image (see sync_modal_stack/modal_app.py)."""
     return (
         modal.Image.from_aws_ecr(
-            f"{REGISTRY}/{repo}:{TAG}", secret=ecr_secret, add_python="3.12"
+            f"{REGISTRY}/{repo}:{tag}", secret=ecr_secret, add_python="3.12"
         )
         .entrypoint([])
         .pip_install(f"modal=={modal.__version__}")
     )
 
 
-asr_image = _vendor_image("self-hosted-streaming-asr-universal-3-5-pro")
-api_image = _vendor_image("self-hosted-streaming-api")
-proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy")
+asr_image = _vendor_image("self-hosted-streaming-asr-universal-3-5-pro", ASR_TAG)
+api_image = _vendor_image("self-hosted-streaming-api", API_TAG)
+proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy", PROXY_TAG)
 
 
 def _launch(argv: list[str], env: dict[str, str]) -> subprocess.Popen:
