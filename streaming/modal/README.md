@@ -70,18 +70,33 @@ headers, or deploy with `AAI_REQUIRE_MODAL_AUTH=0` for a throwaway public test
 endpoint (any non-empty `Authorization` then connects, as behind your own
 gateway).
 
-The internal hops (`StreamingApi` → `Asr`/`Lb`, and → `LicenseProxy`) cross
-Modal's TLS edge, **not** a private bridge network as in compose: Modal has no
-private inter-container network by default, so these `.modal.direct` endpoints
-are public. The gRPC hop is encrypted — `h2_enabled` advertises ALPN h2 so the
-API's default-TLS gRPC client connects with `AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=True`
-— but the backends and proxy are `unauthenticated=True`, because the API dials
-them server-side and cannot attach Modal auth headers. Their URLs are
-unguessable but reachable by anyone who learns them; a determined operator can
-close that gap by co-locating the API and ASR in one container (localhost hop)
-or by putting the backends on Modal's `i6pn` private network (an address
-handshake via `modal.Dict`, same region). Treat the shipped topology as suitable
-for evaluation, not untrusted public exposure of the backends.
+This authenticated front door is the real access gate.
+
+The internal hops (`StreamingApi` to `Asr`/`Lb`, and to `LicenseProxy`) cross
+Modal's TLS edge, **not** a private bridge network as in compose, because Modal
+has no private inter-container network by default, so these `.modal.direct`
+endpoints are public. The gRPC hop is encrypted (`h2_enabled` advertises ALPN h2
+so the API's default-TLS gRPC client connects with
+`AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=True`), but the backends and proxy run
+`unauthenticated=True`, because the API dials them server-side and cannot attach
+Modal auth headers. Their URLs are long and structured but public: obscurity, not
+access control. The residual risk is bounded, though: forging a `POST /v1/usage`
+inflates the self-hoster's own usage bill (it does not grant free service), and
+reaching the ASR directly needs the URL and only buys time on the operator's own
+GPU. No audio leaves the deployment and there is no cross-tenant surface.
+
+Taking the backends fully private is a Modal limitation for this deployment
+shape, not a config toggle. Both native routes fall down here: co-locating every
+service in one container is not viable (the three vendor images are separate),
+and Modal's `i6pn` private fabric only connects containers in the same underlying
+datacenter, which the credit-card plan does not guarantee. A GPU backend (L40S)
+is placed in a different datacenter than the CPU front-ends, and `i6pn` does not
+bridge datacenters (forcing same-datacenter placement is gated behind Modal
+sales). A full private `i6pn` build was implemented and tested to confirm this;
+it connects only when the containers happen to co-locate. Treat the shipped
+topology as suitable for evaluation behind the authenticated front door; a
+stricter production posture (backends off the public internet) needs Modal to
+enable same-datacenter placement.
 
 ## Sample requests
 
