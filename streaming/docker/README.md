@@ -5,7 +5,7 @@ Real-time transcription over a WebSocket connection. Run all commands from this
 
 > Prerequisites (license, Docker, GPU runtime, ECR auth) and the shared
 > license-and-usage-proxy (usage reporting, license status endpoint, proxy
-> production recommendations) are documented in the [top-level README](../README.md).
+> production recommendations) are documented in the [top-level README](../../README.md).
 
 ## Choosing a stack
 
@@ -24,7 +24,7 @@ To switch between stacks, run `docker compose -f <file> down` before starting th
 Both stacks include:
 - **streaming-api**: Gateway API service handling WebSocket connections.
 - **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
-- **license-and-usage-proxy**: License validation and usage reporting (see [top-level README](../README.md#shared-component-license-and-usage-proxy)).
+- **license-and-usage-proxy**: License validation and usage reporting (see [top-level README](../../README.md#shared-component-license-and-usage-proxy)).
 
 ASR backends differ by stack:
 - Universal stack (`docker-compose.english-multilang.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
@@ -64,7 +64,7 @@ to an available backend.
 
 ## Setup
 
-Complete the [shared prerequisites](../README.md#prerequisites-all-services)
+Complete the [shared prerequisites](../../README.md#prerequisites-all-services)
 (GPU runtime, ECR authentication, license file) first.
 
 Copy the env reference and set the image variables for the stack you plan to run:
@@ -188,7 +188,7 @@ python example_with_prerecorded_audio_file.py --help
 ### Usage reporting
 
 The license-and-usage-proxy's billing modes and behavior are documented in the
-[top-level README](../README.md#usage-reporting).
+[top-level README](../../README.md#usage-reporting).
 
 ## Monitoring & debugging
 
@@ -215,9 +215,14 @@ docker compose -f docker-compose.english-multilang.yml restart streaming-asr-mul
 docker compose -f docker-compose.universal-3-5-pro.yml restart streaming-asr-universal-3-5-pro
 ```
 
+## Deploying on Modal (serverless GPU)
+
+Both streaming stacks also run on Modal's serverless GPUs as self-contained,
+single-`modal deploy` Modal Apps. See [`../modal/`](../modal/).
+
 ## Production deployment recommendations
 
-See the [top-level README](../README.md#production-recommendations-license-and-usage-proxy)
+See the [top-level README](../../README.md#production-recommendations-license-and-usage-proxy)
 for the license-and-usage-proxy. Streaming-specific services follow.
 
 ### streaming-api service

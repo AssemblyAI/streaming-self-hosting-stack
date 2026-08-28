@@ -14,21 +14,30 @@ and, within each service, by **model**.
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
   stack serves multiple models; the client selects the model per session. See
-  [`streaming/README.md`](streaming/README.md).
+  [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
   ≤ 120 s by default). It is self-contained — a single GPU container plus the
-  license-and-usage-proxy, no load balancer. See [`sync/README.md`](sync/README.md).
+  license-and-usage-proxy, no load balancer. See [`sync/docker/README.md`](sync/docker/README.md).
 
-Each service directory is self-contained: its compose file(s), `.env.example`,
-example client, and `README.md` live together. Run commands from inside the
-service directory.
+Each stack is self-contained under `<service>/docker/`: its compose file(s),
+`.env.example`, example client, and `README.md` live together. Run compose
+commands from inside that directory.
+
+Each stack can also run on serverless GPUs instead of hardware you manage. Every
+stack is a self-contained Modal App deployed with a single `modal deploy` — see
+[`sync/modal/`](sync/modal/) and
+[`streaming/modal/`](streaming/modal/).
 
 ## Repository layout
 
 ```
 .
-├── streaming/   # WebSocket streaming ASR (Universal English/Multilingual, Universal-3.5 Pro)
-└── sync/        # Synchronous full-file HTTP transcription (Universal-3.5 Pro)
+├── streaming/
+│   ├── docker/  # compose stack (Universal English/Multilingual, Universal-3.5 Pro)
+│   └── modal/   # serverless-GPU packages
+└── sync/
+    ├── docker/  # compose stack (Universal-3.5 Pro)
+    └── modal/   # serverless-GPU package
 ```
 
 ## Prerequisites (all services)
@@ -60,9 +69,9 @@ aws ecr get-login-password --region us-west-2 \
 
 ### License file
 
-Place your AssemblyAI `license.jwt` in the directory of the service you are
-running (`streaming/` or `sync/`), or point the `LICENSE_FILE_PATH` environment
-variable in that service's compose file at your license file's location.
+Place your AssemblyAI `license.jwt` in the directory of the stack you are
+running (`streaming/docker/` or `sync/docker/`), or point the `LICENSE_FILE_PATH`
+environment variable in that stack's compose file at your license file's location.
 
 ## Shared component: license-and-usage-proxy
 
@@ -143,7 +152,7 @@ This release introduces the **Sync self-hosted service**
 model. It transcribes a complete audio file (≤ 120 s) in a single
 `POST /transcribe` request/response — a single GPU container plus the
 license-and-usage-proxy, no load balancer. It exposes `GET /readyz` (200 once
-the model is warm) for readiness probes. See [`sync/README.md`](sync/README.md).
+the model is warm) for readiness probes. See [`sync/docker/README.md`](sync/docker/README.md).
 
 #### Streaming — U3 Pro replaced by Universal-3.5 Pro (BREAKING)
 
@@ -165,9 +174,10 @@ upgrading from the v0.6.0 U3 Pro stack:
 
 #### Images
 
-`release-v1.0.0` is published for `self-hosted-streaming-api`,
-`self-hosted-streaming-license-and-usage-proxy`,
-`self-hosted-streaming-asr-universal-3-5-pro`, and `self-hosted-sync-asr-u3-pro`.
+`release-v1.0.1` is published for `self-hosted-streaming-api` (adds the
+peer-aborted-handshake logging fix) and `self-hosted-streaming-asr-universal-3-5-pro`;
+`release-v1.0.0` for `self-hosted-streaming-license-and-usage-proxy` and
+`self-hosted-sync-asr-u3-pro`.
 The English and Multilingual ASR images are unchanged since v0.6.0 — keep
 `STREAMING_ASR_ENGLISH_IMAGE` and `STREAMING_ASR_MULTILANG_IMAGE` at
 `release-v0.6.0` (see `streaming/.env.example`).
