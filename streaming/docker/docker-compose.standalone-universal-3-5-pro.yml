@@ -1,0 +1,93 @@
+# Single-container self-hosted streaming stack using the Universal-3.5 Pro ASR backend.
+#
+# Serves the Universal-3.5 Pro model in a single container with both the streaming API
+# gateway and ASR model running together (via in-container loopback gRPC). No nginx
+# load balancer, no separate ASR container. Best for single-model deployments and
+# environments where multi-container compose networking is difficult.
+#
+# Websocket clients select the model with speech_model "universal-3-5-pro".
+#
+# Recommended for:
+# - Single-model Universal-3.5 Pro deployments
+# - Environments without multi-container compose deploy.resources support (Kubernetes, Podman)
+# - Simpler setups where multi-container compose networking is a problem
+#
+# Not suitable for multi-model deployments (English + Multilingual) — use the
+# multi-container stack (docker-compose.universal-3-5-pro.yml) instead.
+#
+# Usage:
+#   docker compose -f docker-compose.standalone-universal-3-5-pro.yml up -d
+#
+# Equivalent docker run (single container):
+#   docker run --gpus all -p 8080:8080 \
+#     -e AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=http://<proxy-host>:8080 \
+#     -e AAI_SUPPORTED_ASR_DEPLOYMENTS=universal-3-5-pro \
+#     --name streaming-standalone <image>
+#
+# For compose, also run license-and-usage-proxy separately and link via network.
+
+services:
+  streaming-standalone:
+    image: ${STREAMING_STANDALONE_UNIVERSAL_3_5_PRO_IMAGE}
+    ports:
+      - "8080:8080"
+    environment:
+      - AAI_WSS_PORT=8080
+      - AAI_LOG_LEVEL=INFO
+      - AAI_USE_STRUCTURED_LOGGING=False
+      - AAI_SUPPORTED_ASR_DEPLOYMENTS=universal-3-5-pro
+      - AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      - MAX_OPEN_STREAMS=32
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      # Optional supervisor tuning (defaults shown; container exits non-zero if timeouts exceeded):
+      # - STANDALONE_ASR_READY_TIMEOUT_SEC=900  # ASR model warmup timeout; container exits code 3 if exceeded
+      # - STANDALONE_API_DRAIN_SEC=30           # API shutdown grace period
+      # - STANDALONE_ASR_DRAIN_SEC=30           # ASR shutdown grace period
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v3/ws/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 600s
+    stop_grace_period: 90s
+    restart: unless-stopped
+    depends_on:
+      - license-and-usage-proxy
+    networks:
+      - streaming-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ "gpu" ]
+
+  license-and-usage-proxy:
+    image: ${LICENSE_AND_USAGE_PROXY_IMAGE}
+    ports:
+      - "8082:8080"
+    environment:
+      - HTTP_PORT=8080
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      - LICENSE_FILE_PATH=/var/aai_license.jwt
+      - USAGE_TRACKING_API_KEY=${USAGE_TRACKING_API_KEY} # Set if license is for usage-based billing
+    volumes:
+      - ./license.jwt:/var/aai_license.jwt:ro
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 10s
+    networks:
+      - streaming-network
+
+networks:
+  streaming-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -9,26 +9,29 @@ Real-time transcription over a WebSocket connection. Run all commands from this
 
 ## Choosing a stack
 
-Two stacks are shipped. Pick the one that matches the model you want to serve —
+Three stacks are shipped. Pick the one that matches the model you want to serve —
 they are mutually exclusive (run one at a time):
 
-| File | Models served | GPU requirement |
-|------|--------------|-----------------|
-| `docker-compose.english-multilang.yml` | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| `docker-compose.universal-3-5-pro.yml` | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 |
+| File | Models served | GPU requirement | Recommended for |
+|------|--------------|-----------------|-----------------|
+| `docker-compose.english-multilang.yml` | Universal English + Multilingual | NVIDIA T4+ per ASR container | Multi-model deployments |
+| `docker-compose.universal-3-5-pro.yml` | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 | Multi-container networking, flexible load balancing |
+| `docker-compose.standalone-universal-3-5-pro.yml` | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 | Single-model deployments, simplified setup, environments without multi-container support (Kubernetes, Podman) |
 
 To switch between stacks, run `docker compose -f <file> down` before starting the other.
 
 ## Services included
 
-Both stacks include:
-- **streaming-api**: Gateway API service handling WebSocket connections.
-- **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
+All stacks include:
 - **license-and-usage-proxy**: License validation and usage reporting (see [top-level README](../../README.md#shared-component-license-and-usage-proxy)).
 
-ASR backends differ by stack:
-- Universal stack (`docker-compose.english-multilang.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
-- Universal-3.5 Pro stack (`docker-compose.universal-3-5-pro.yml`): `streaming-asr-universal-3-5-pro`.
+Multi-container stacks (`docker-compose.english-multilang.yml` and `docker-compose.universal-3-5-pro.yml`):
+- **streaming-api**: Gateway API service handling WebSocket connections.
+- **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
+- **streaming-asr-english** and **streaming-asr-multilang** (English/Multilingual stack) or **streaming-asr-universal-3-5-pro** (Universal-3.5 Pro stack): ASR backends.
+
+Standalone stack (`docker-compose.standalone-universal-3-5-pro.yml`):
+- **streaming-standalone**: Single container running both the streaming API gateway and the Universal-3.5 Pro ASR model (no nginx load balancer, no separate ASR container).
 
 ## Connection flow
 
@@ -57,10 +60,21 @@ Websocket client → streaming-api:8080 (WebSocket)
                                                                                 └── universal-3-5-pro → streaming-asr-universal-3-5-pro:50051 (gRPC)
 ```
 
-Both stacks share the same `nginx_streaming_asr.conf`, which routes by
-`X-Model-Version` header. Each stack only deploys the backends it needs —
-websocket clients should use a `speech_model` query parameter value that routes
-to an available backend.
+**Standalone stack** (`docker-compose.standalone-universal-3-5-pro.yml`):
+```
+Websocket client → streaming-standalone:8080 (WebSocket)
+                          │
+                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
+                          │                               │
+                          ├─ License validation  ─────────┘
+                          │
+                          └─ ASR requests        ───────→ [in-container loopback gRPC]
+                                                             Universal-3.5 Pro ASR model
+```
+
+Multi-container stacks share the same `nginx_streaming_asr.conf`, which routes by
+`X-Model-Version` header. The standalone stack requires no load balancer—
+websocket clients should use `speech_model=universal-3-5-pro` for the standalone stack.
 
 ## Setup
 
@@ -74,7 +88,7 @@ cp .env.example .env
 ```
 
 ```bash
-# Required for both stacks:
+# Required for all stacks:
 STREAMING_API_IMAGE=<CUSTOM_IMAGE>
 LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
 
@@ -82,18 +96,20 @@ LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
 STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
 
-# Required for the Universal-3.5 Pro stack (docker-compose.universal-3-5-pro.yml):
+# Required for the multi-container Universal-3.5 Pro stack (docker-compose.universal-3-5-pro.yml):
 STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE=<CUSTOM_IMAGE>
+
+# Required for the standalone single-container Universal-3.5 Pro stack (docker-compose.standalone-universal-3-5-pro.yml):
+STREAMING_STANDALONE_UNIVERSAL_3_5_PRO_IMAGE=<CUSTOM_IMAGE>
 ```
 
 Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in the compose file).
 
 ## Run
 
-Both stacks use the same `streaming-api`, load balancer, and license proxy —
-they differ only in the ASR backend. For the Universal-3.5 Pro stack, websocket clients
-should set query parameter `speech_model` to `universal-3-5-pro` so the load balancer
-routes to the Universal-3.5 Pro backend.
+All stacks bind the same WebSocket port (8080), so they are mutually exclusive.
+For all Universal-3.5 Pro stacks (multi-container and standalone), websocket clients
+should set query parameter `speech_model` to `universal-3-5-pro`.
 
 **Universal stack** (English + Multilingual):
 ```bash
@@ -107,7 +123,7 @@ docker compose -f docker-compose.english-multilang.yml ps
 docker compose -f docker-compose.english-multilang.yml down
 ```
 
-**Universal-3.5 Pro stack**:
+**Multi-container Universal-3.5 Pro stack**:
 ```bash
 docker compose -f docker-compose.universal-3-5-pro.yml up -d
 docker compose -f docker-compose.universal-3-5-pro.yml logs -f
@@ -117,6 +133,18 @@ docker compose -f docker-compose.universal-3-5-pro.yml ps
 
 # Stop services before switching stacks
 docker compose -f docker-compose.universal-3-5-pro.yml down
+```
+
+**Standalone single-container Universal-3.5 Pro stack**:
+```bash
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml up -d
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml logs -f
+
+# Check service status
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml ps
+
+# Stop services before switching stacks
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml down
 ```
 
 ## Service endpoints
@@ -189,6 +217,51 @@ python example_with_prerecorded_audio_file.py --help
 
 The license-and-usage-proxy's billing modes and behavior are documented in the
 [top-level README](../../README.md#usage-reporting).
+
+## Standalone stack notes
+
+The standalone single-container stack (`docker-compose.standalone-universal-3-5-pro.yml`)
+runs both the streaming API gateway and the Universal-3.5 Pro ASR model in a single container
+with no nginx load balancer. It is recommended for single-model deployments and environments
+where multi-container compose networking is difficult.
+
+### Health and readiness
+
+The container's readiness depends on both services (API and ASR) being healthy:
+
+- **Healthcheck endpoint**: `GET http://localhost:8080/v3/ws/health` returns 200 only after
+  the ASR model is fully loaded and warmed.
+- **Warmup time**: Model loading takes roughly 4 minutes on an RTX PRO 6000 and longer on
+  slower GPUs. The compose healthcheck has `start_period: 600s` (10 minutes) to account for
+  this; adjust if needed for your hardware.
+- **Readiness behavior**: WebSocket connections are accepted once both services are ready;
+  before the ASR is warm, clients receive a close code 1011 (server error).
+
+### Shutdown
+
+The container performs an ordered shutdown (API first, then ASR) and can take up to ~60 seconds:
+
+- The compose file specifies `stop_grace_period: 90s` to allow graceful termination.
+- If either internal process (API or ASR) exits unexpectedly, the container exits with a
+  non-zero code, so use `restart: unless-stopped` to restart on failure.
+
+### Supervisor tuning (optional)
+
+The container runs both services under a supervisor that manages startup, shutdown, and health.
+Optional environment variables allow tuning timeouts:
+
+| Variable | Default (seconds) | Purpose |
+|----------|-------------------|---------|
+| `STANDALONE_ASR_READY_TIMEOUT_SEC` | 900 | ASR model warmup timeout; container exits with code 3 if exceeded |
+| `STANDALONE_API_DRAIN_SEC` | 30 | API shutdown grace period (for in-flight requests) |
+| `STANDALONE_ASR_DRAIN_SEC` | 30 | ASR shutdown grace period (for in-flight transcriptions) |
+
+### When to use multi-container vs. standalone
+
+- **Use standalone** (`docker-compose.standalone-universal-3-5-pro.yml`): Single Universal-3.5 Pro deployment,
+  simplified ops, or environments without multi-container compose support (Kubernetes, Podman).
+- **Use multi-container** (`docker-compose.universal-3-5-pro.yml` or `docker-compose.english-multilang.yml`):
+  Multi-model deployments (English + Multilingual), load-balanced scaling, or independent container updates.
 
 ## Monitoring & debugging
 
