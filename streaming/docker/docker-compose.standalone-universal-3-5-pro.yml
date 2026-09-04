@@ -13,7 +13,7 @@
 # - Simpler setups where multi-container compose networking is a problem
 #
 # Not suitable for multi-model deployments (English + Multilingual) — use the
-# multi-container stack (docker-compose.universal-3-5-pro.yml) instead.
+# multi-container stack (docker-compose.english-multilang.yml) instead.
 #
 # Usage:
 #   docker compose -f docker-compose.standalone-universal-3-5-pro.yml up -d
