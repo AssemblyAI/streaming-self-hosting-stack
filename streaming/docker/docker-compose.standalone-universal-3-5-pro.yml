@@ -22,9 +22,10 @@
 #   docker run --gpus all -p 8080:8080 \
 #     -e AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=http://<proxy-host>:8080 \
 #     -e AAI_SUPPORTED_ASR_DEPLOYMENTS=universal-3-5-pro \
-#     --name streaming-standalone <image>
+#     --name streaming-standalone <CUSTOM_IMAGE>
 #
-# For compose, also run license-and-usage-proxy separately and link via network.
+# Note: The proxy service must be reachable at the URL in AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT.
+# In docker run mode, run the license-and-usage-proxy separately and link via network.
 
 services:
   streaming-standalone:
@@ -48,7 +49,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080/v3/ws/health"]
       interval: 10s
       timeout: 2s
-      retries: 3
+      retries: 2
       start_period: 600s
     stop_grace_period: 90s
     restart: unless-stopped

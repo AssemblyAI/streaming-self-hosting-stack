@@ -225,17 +225,23 @@ runs both the streaming API gateway and the Universal-3.5 Pro ASR model in a sin
 with no nginx load balancer. It is recommended for single-model deployments and environments
 where multi-container compose networking is difficult.
 
+### Model configuration
+
+- **`AAI_SUPPORTED_ASR_DEPLOYMENTS=universal-3-5-pro`**: Tells the API that this container
+  serves only the Universal-3.5 Pro model. Clients requesting a different `speech_model` are
+  rejected at handshake with close code 3006 instead of being transcribed by the wrong model.
+
 ### Health and readiness
 
 The container's readiness depends on both services (API and ASR) being healthy:
 
 - **Healthcheck endpoint**: `GET http://localhost:8080/v3/ws/health` returns 200 only after
   the ASR model is fully loaded and warmed.
-- **Warmup time**: Model loading takes roughly 4 minutes on an RTX PRO 6000 and longer on
-  slower GPUs. The compose healthcheck has `start_period: 600s` (10 minutes) to account for
-  this; adjust if needed for your hardware.
-- **Readiness behavior**: WebSocket connections are accepted once both services are ready;
-  before the ASR is warm, clients receive a close code 1011 (server error).
+- **Warmup time**: Model loading takes ~5 min on an RTX PRO 6000 and longer on slower GPUs.
+  The compose healthcheck has `start_period: 600s` (10 minutes) to account for this; adjust if
+  needed for your hardware.
+- **Readiness behavior**: The WebSocket port (8080) is not open for connections until the
+  health endpoint returns 200. Once the ASR is warm, clients can start sessions.
 
 ### Shutdown
 
@@ -255,6 +261,11 @@ Optional environment variables allow tuning timeouts:
 | `STANDALONE_ASR_READY_TIMEOUT_SEC` | 900 | ASR model warmup timeout; container exits with code 3 if exceeded |
 | `STANDALONE_API_DRAIN_SEC` | 30 | API shutdown grace period (for in-flight requests) |
 | `STANDALONE_ASR_DRAIN_SEC` | 30 | ASR shutdown grace period (for in-flight transcriptions) |
+
+### ASR runtime configuration
+
+The ASR runtime flags (including `VLLM_USE_FLASHINFER_SAMPLER=0` for compatibility with newer
+GPUs) are set inside the image and require no operator configuration.
 
 ### When to use multi-container vs. standalone
 
@@ -286,12 +297,18 @@ docker compose -f docker-compose.english-multilang.yml restart streaming-asr-mul
 
 # Restart specific service (Universal-3.5 Pro stack)
 docker compose -f docker-compose.universal-3-5-pro.yml restart streaming-asr-universal-3-5-pro
+
+# Restart specific service (Standalone stack)
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml restart streaming-standalone
+docker compose -f docker-compose.standalone-universal-3-5-pro.yml logs -f streaming-standalone
 ```
 
 ## Deploying on Modal (serverless GPU)
 
-Both streaming stacks also run on Modal's serverless GPUs as self-contained,
-single-`modal deploy` Modal Apps. See [`../modal/`](../modal/).
+The two multi-container streaming stacks (English/Multilingual and Universal-3.5 Pro)
+run on Modal's serverless GPUs as self-contained, single-`modal deploy` Modal Apps.
+See [`../modal/`](../modal/). The standalone single-container stack is not yet packaged
+for Modal.
 
 ## Production deployment recommendations
 
@@ -323,3 +340,10 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
+
+### streaming-standalone service
+- **Deployment Strategy**: Deploy new versions by starting a second container and switching traffic after its health endpoint (`GET /v3/ws/health`) returns 200. Since a container restart incurs the full model warmup (~5 min), Blue/Green deployments are preferred over rolling updates.
+- **Hardware Requirements**: Size the host for both the API's per-session CPU work and the ASR's CPU-side preprocessing (in the multi-container stack, these run on separate hosts). NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 GPU. Allow ~30 GB of disk for the ~23 GB Docker image plus working space.
+- **Resource Allocation**: One GPU per container; size CPU and RAM for both the API gateway (2 CPU, 2 GB RAM minimum) and ASR preprocessing overhead (~2–4 CPU, 4–8 GB RAM for concurrent session handling).
+- **Monitoring**: Always monitor logs during deployment and the health endpoint after startup to verify model readiness.
+- **Health Checks**: Use the healthcheck endpoint and the compose healthcheck; traffic should only be sent to containers where `GET /v3/ws/health` returns 200.
