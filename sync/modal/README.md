@@ -4,12 +4,16 @@
 [Modal](https://modal.com) instead of a GPU box you manage. It is a
 self-contained Modal App: one `modal deploy` brings up both services and wires
 them together, and nothing depends on another deployment. Compose's two services
-(see [`../docker/`](../docker/)) become two Modal Servers:
+(see [`../docker/`](../docker/)) become two Modal services:
 
-| Compose service | Modal Server | Hardware |
-|---|---|---|
-| `sync-api` | `SyncApi` | L40S GPU |
-| `license-and-usage-proxy` | `LicenseProxy` | CPU |
+| Compose service | Modal service | Kind | Hardware |
+|---|---|---|---|
+| `sync-api` | `SyncApi` | Modal Server (`@app.server`) | L40S GPU |
+| `license-and-usage-proxy` | `LicenseProxy` | web-server class (`@app.cls` + `@modal.web_server`) | CPU |
+
+The proxy is a plain web function rather than a Server because it is a small CPU
+service whose only callers are the sync containers, and a web function can scale
+to zero when a deployment allows it (see [Cost and teardown](#cost-and-teardown)).
 
 `SyncApi` resolves `LicenseProxy`'s URL from the same App at startup, so there
 is no manual wiring or two-phase deploy.
@@ -52,7 +56,9 @@ modal deploy modal_app.py
 
 The first deploy pulls and converts the ~13.5 GB sync image (several minutes);
 later deploys reuse the cached image and take seconds. Two endpoint URLs are
-printed, of the form `https://<workspace>--aai-sync-u3pro-<server>.<region>.modal.direct`.
+printed: `https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct` for
+the API and `https://<workspace>--aai-sync-u3pro-licenseproxy-start-server.modal.run`
+for the proxy.
 
 ## Verify
 
@@ -63,7 +69,7 @@ show those headers — omit them only against an endpoint deployed with
 `AAI_REQUIRE_MODAL_AUTH=0`, where any non-empty `Authorization` connects.
 
 ```bash
-curl -fsS https://<workspace>--aai-sync-u3pro-licenseproxy.<region>.modal.direct/v1/status
+curl -fsS https://<workspace>--aai-sync-u3pro-licenseproxy-start-server.modal.run/v1/status
 # {"state":"Connected", ...}
 
 curl -sS -o /dev/null -w '%{http_code}\n' \
@@ -88,9 +94,9 @@ dashboard and send it on every request as `Modal-Key` / `Modal-Secret` headers
 (or `Authorization: Bearer <key>.<secret>`). For a throwaway public test
 endpoint, deploy with `AAI_REQUIRE_MODAL_AUTH=0` — it then accepts any non-empty
 `Authorization` header, exactly like the compose stack behind your own gateway.
-`LicenseProxy` is always `unauthenticated=True` because `SyncApi` calls it
-server-side and cannot attach Modal headers; its URL is unguessable but public,
-so treat it as such.
+`LicenseProxy` is always public (a `@modal.web_server` endpoint without proxy
+auth) because `SyncApi` calls it server-side and cannot attach Modal headers; its
+URL is unguessable but public, so treat it as such.
 
 ## Configuration
 
@@ -98,6 +104,10 @@ The audio limits (`MAX_AUDIO_DURATION_MS`, `MIN_AUDIO_DURATION_MS`,
 `MAX_REQUEST_BYTES`, `INFERENCE_TIMEOUT_SECONDS`) are read from the environment
 with the compose defaults as fallback, so you can override them by adding the
 variable to the `aai-license` secret (or any Server env) — your value wins.
+
+`PROXY_MIN_CONTAINERS` (default `1`) sets how many `LicenseProxy` containers stay
+warm; see [Cost and teardown](#cost-and-teardown) before lowering it. Set it in
+the shell that runs `modal deploy`.
 
 ## Sample requests
 
@@ -119,7 +129,18 @@ If the stack was deployed with the default proxy auth, pass `--modal-key` /
 `SyncApi` keeps one L40S warm (`min_containers=1`) so requests do not eat a cold
 start; it autoscales up to `max_containers` under load and back down after
 `scaledown_window`. Modal bills the GPU while it is up, so tear the app down when
-you are done:
+you are done.
+
+`LicenseProxy` also keeps one CPU container warm by default. Usage-billed
+licenses need that: the sync API posts one usage record per request with a short
+timeout, and the proxy holds queued usage in memory with no shutdown flush, so a
+proxy that cold-starts or scales down loses billable usage and re-registers with
+the usage tracker on every start. Flat-billed licenses never send usage, so they
+can deploy with `PROXY_MIN_CONTAINERS=0 modal deploy modal_app.py` and let the
+proxy scale to zero (about 10 s cold start; the sync API's license poll retries
+through it).
+
+Tear down:
 
 ```bash
 modal app stop aai-sync-u3pro

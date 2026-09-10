@@ -1,11 +1,12 @@
 """Run the self-hosted sync (full-file HTTP) stack on Modal as a standalone app.
 
 `modal deploy modal_app.py` brings up the whole stack in one command. Compose's
-two services become two Modal Servers in one App, so nothing here depends on any
-other deployment:
+two services become two Modal services in one App, so nothing here depends on
+any other deployment:
 
-  license_proxy  (CPU)  -> license-and-usage-proxy
-  sync_api       (L40S) -> sync-api, which resolves the proxy's URL at startup
+  license_proxy  (CPU)  -> license-and-usage-proxy, a web-server class
+  sync_api       (L40S) -> sync-api, a Modal Server that resolves the proxy's
+                           URL at startup
 
 Deploy:  modal deploy modal_app.py
 Tear down: modal app stop aai-sync-u3pro
@@ -32,14 +33,25 @@ TAG = "release-v1.0.0"
 # that accepts any non-empty Authorization header (see README "Authentication").
 REQUIRE_MODAL_AUTH = os.environ.get("AAI_REQUIRE_MODAL_AUTH", "1") != "0"
 
-# Vendor image ENTRYPOINTs, launched explicitly in each Server's @modal.enter.
-# Modal prepends an image's ENTRYPOINT to its own runtime command, so both
-# images clear it with .entrypoint([]); otherwise the vendor binary consumes
-# Modal's arguments, starts with default env, and this code never runs.
+# Warm proxy containers. 1 (the default) keeps the proxy always on, which the
+# usage-billed path needs: the sync API POSTs one usage record per request with
+# a short timeout, and the proxy holds queued usage in memory with no shutdown
+# flush, so a cold-started or scaled-down proxy loses usage. Flat-billed
+# licenses never send usage, so they can set PROXY_MIN_CONTAINERS=0 and let the
+# proxy scale to zero (cold start is ~10 s; the sync API's license poll retries
+# through it). See README "Cost and teardown".
+PROXY_MIN_CONTAINERS = int(os.environ.get("PROXY_MIN_CONTAINERS", "1"))
+
+# Vendor image ENTRYPOINTs, launched explicitly at container start. Modal
+# prepends an image's ENTRYPOINT to its own runtime command, so both images
+# clear it with .entrypoint([]); otherwise the vendor binary consumes Modal's
+# arguments, starts with default env, and this code never runs.
 SYNC_BIN = "/opt/assemblyai/engineering/projects/realtime/asr_sync_u3pro/self_hosted_bin"
 PROXY_BIN = "/opt/assemblyai/engineering/projects/realtime/license_and_usage_proxy/bin"
 
 LICENSE_PATH = "/var/aai_license.jwt"
+PROXY_PORT = 8080
+SYNC_PORT = 8080
 
 ecr_secret = modal.Secret.from_name("aai-ecr-credentials")
 license_secret = modal.Secret.from_name("aai-license")
@@ -64,12 +76,19 @@ def _vendor_image(repo: str) -> modal.Image:
     )
 
 
-proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy")
+proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy").env(
+    {
+        "HTTP_PORT": str(PROXY_PORT),
+        "LOGGING_LEVEL": "INFO",
+        "USE_STRUCTURED_LOGGING": "False",
+        "LICENSE_FILE_PATH": LICENSE_PATH,
+    }
+)
 sync_image = _vendor_image("self-hosted-sync-asr-u3-pro")
 
 
 # Set by each @modal.exit stop() so the fate-share reaper can tell an intentional
-# teardown from an unexpected vendor exit (one server per container).
+# teardown from an unexpected vendor exit (one service per container).
 _stopping = threading.Event()
 
 
@@ -113,30 +132,23 @@ def _wait_http_ok(url: str, timeout_s: int) -> None:
     raise RuntimeError(f"{url} not ready after {timeout_s}s (last: {last})")
 
 
-@app.server(
+# The proxy is a web-server class rather than a Modal Server: it is a small CPU
+# service whose only callers are the sync containers, and a web function can
+# scale to zero (PROXY_MIN_CONTAINERS=0) while a Server answers 503 when idle.
+# Called server-side by sync_api, which cannot attach Modal auth headers to its
+# requests, so the endpoint stays public (web_server's default). Its URL is
+# unguessable but public; see README "Authentication".
+@app.cls(
     image=proxy_image,
-    port=8080,
-    # Called server-side by sync_api, which cannot attach Modal auth headers to
-    # its request, so this endpoint must accept unauthenticated traffic. Its URL
-    # is unguessable but public; see README "Authentication".
-    unauthenticated=True,
-    cpu=1,
-    memory=2048,
-    min_containers=1,
-    max_containers=1,
+    min_containers=PROXY_MIN_CONTAINERS,
+    scaledown_window=300,
     startup_timeout=180,
-    exit_grace_period=30,
     secrets=[license_secret],
-    env={
-        "HTTP_PORT": "8080",
-        "LOGGING_LEVEL": "INFO",
-        "USE_STRUCTURED_LOGGING": "False",
-        "LICENSE_FILE_PATH": LICENSE_PATH,
-    },
 )
+@modal.concurrent(max_inputs=100)  # one container serves many usage POSTs
 class LicenseProxy:
-    @modal.enter()
-    def start(self) -> None:
+    @modal.web_server(port=PROXY_PORT, startup_timeout=180)
+    def start_server(self) -> None:
         # Compose bind-mounts license.jwt; Modal has no bind mounts, so the JWT
         # arrives as a secret and is written to disk at startup. Accept either
         # key name so the same secret works across tooling.
@@ -147,11 +159,13 @@ class LicenseProxy:
         # secret and it reaches the proxy here through the environment. Nothing
         # else to change.
         self.proc = _launch([PROXY_BIN], {})
-        _wait_http_ok("http://localhost:8080/health", 60)
+        _wait_http_ok(f"http://localhost:{PROXY_PORT}/health", 60)
 
     @modal.exit()
     def stop(self) -> None:
-        # Graceful stop lets the proxy flush queued usage before exit.
+        # The proxy has no shutdown hook of its own: usage still queued in
+        # memory at this point is lost, which is why usage-billed deployments
+        # keep PROXY_MIN_CONTAINERS >= 1.
         _stopping.set()
         self.proc.send_signal(signal.SIGTERM)
         try:
@@ -165,7 +179,7 @@ class LicenseProxy:
     gpu="L40S",
     cpu=4,
     memory=16384,
-    port=8080,
+    port=SYNC_PORT,
     unauthenticated=not REQUIRE_MODAL_AUTH,
     # Scale-out signal: concurrent in-flight /transcribe requests (GPU-bound).
     # Start conservative and tune against bench/harness.py on your hardware.
@@ -180,15 +194,19 @@ class LicenseProxy:
 class SyncApi:
     @modal.enter()
     def start(self) -> None:
-        proxy_url = os.environ.get("PROXY_ENDPOINT") or modal.Server.from_name(
-            APP_NAME, "LicenseProxy"
-        ).get_url().rstrip("/")
+        # LicenseProxy is a class with a web_server method, so its URL comes from
+        # the web endpoint on the bound method (Server.from_name would not
+        # resolve it).
+        proxy_url = (
+            os.environ.get("PROXY_ENDPOINT")
+            or modal.Cls.from_name(APP_NAME, "LicenseProxy")().start_server.get_web_url()
+        ).rstrip("/")
         print(f"[startup] proxy={proxy_url} require_auth={REQUIRE_MODAL_AUTH}", flush=True)
 
         self.proc = _launch(
             [SYNC_BIN],
             {
-                "HTTP_PORT": "8080",
+                "HTTP_PORT": str(SYNC_PORT),
                 "AAI_ENV": "production",
                 "LOGGING_LEVEL": "INFO",
                 "USE_STRUCTURED_LOGGING": "False",
@@ -205,7 +223,7 @@ class SyncApi:
                 "VLLM_USE_FLASHINFER_SAMPLER": "0",
             },
         )
-        _wait_http_ok("http://localhost:8080/readyz", 840)
+        _wait_http_ok(f"http://localhost:{SYNC_PORT}/readyz", 840)
 
     @modal.exit()
     def stop(self) -> None:
