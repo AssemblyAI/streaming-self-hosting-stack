@@ -135,6 +135,50 @@ until the first successful validation).
 
 ## Changelog
 
+### v1.1.0
+
+#### Sync — New Features
+
+- **Compressed audio.** `/transcribe` now accepts AAC, MP3, M4A, OGG, WebM, and
+  FLAC in addition to WAV and raw PCM.
+- **Word timestamps.** Set `"timestamps": true` in the config part for per-word
+  `start`/`end` in milliseconds. Requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on
+  the `sync-api` container; the alignment checkpoint ships in the image.
+- **13 more languages**: Korean, Russian, Catalan, Galician, Romanian,
+  Estonian, Persian, Cantonese, Afrikaans, Marathi, Zulu, Xhosa, and Norwegian
+  Nynorsk.
+- **`GET /warm`** pre-warms a connection ahead of a latency-sensitive request.
+- **`/v1` route prefix.** Sync routes are served at `/v1/...`; the unprefixed
+  paths continue to work, so existing clients need no change.
+- **`keyterms_prompt`** is the preferred name for the keyterms list, matching
+  the streaming API. `keyterms` and `word_boost` are accepted as aliases;
+  passing more than one returns `400`.
+
+#### Sync — Fixes and Improvements
+
+- Usage reporting for self-hosted sync is now accepted end to end by the
+  usage-tracker API. On v1.0.0 these reports were rejected, which on
+  usage-based licenses also crash-looped the proxy.
+- Guardrails against runaway decodes (output-token cap, frequency penalty) and
+  a per-chunk hallucination guardrail.
+- Bracketed speaker tags no longer leak into transcripts.
+- Prompt handling now preserves explicit language selection, and prompt
+  assembly matches the async Universal-3.5 Pro pipeline.
+- Faster large uploads, faster prompt-budget trimming, and per-stage latency
+  metrics on `/transcribe`.
+
+#### Behavior change
+
+- Unknown fields in the `config` part are now rejected with `400`. Previously
+  they were ignored, so a misspelled option silently did nothing. Check your
+  config keys before upgrading.
+
+#### Images
+
+`release-v1.1.0` is published for `self-hosted-sync-asr-u3-pro`. All other
+images are unchanged from v1.0.0 — keep `LICENSE_AND_USAGE_PROXY_IMAGE` at
+`release-v1.0.0` (see `sync/docker/.env.example`).
+
 ### v1.0.0
 
 #### Repository restructure

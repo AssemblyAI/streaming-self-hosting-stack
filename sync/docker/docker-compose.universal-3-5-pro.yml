@@ -31,6 +31,11 @@ services:
       - MIN_AUDIO_DURATION_MS=${MIN_AUDIO_DURATION_MS:-80}
       - MAX_REQUEST_BYTES=${MAX_REQUEST_BYTES:-41943040}
       - INFERENCE_TIMEOUT_SECONDS=${INFERENCE_TIMEOUT_SECONDS:-30}
+      # Word timestamps are computed by forced alignment, which costs extra
+      # GPU time per request. The aligner's checkpoint ships in the image; this
+      # flag loads it at startup. Off means `timestamps: true` requests return
+      # words without `start`/`end`.
+      - SYNC_BFA_ALIGNMENT_ENABLED=${SYNC_BFA_ALIGNMENT_ENABLED:-false}
       # Required on newer GPUs (e.g. Blackwell): the FlashInfer sampler would
       # otherwise JIT-compile a kernel at startup and needs nvcc (absent from the
       # image), crashing the engine. Disabling it is safe on supported GPUs too.
