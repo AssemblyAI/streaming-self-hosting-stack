@@ -26,7 +26,8 @@ import modal
 
 APP_NAME = "aai-sync-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-TAG = "release-v1.0.0"
+SYNC_TAG = "release-v1.1.0"
+PROXY_TAG = "release-v1.0.0"
 
 # The API's public endpoint requires a Modal proxy-auth token by default, so a
 # guessed URL alone cannot reach it. Set to False for a throwaway test endpoint
@@ -59,7 +60,7 @@ license_secret = modal.Secret.from_name("aai-license")
 app = modal.App(APP_NAME)
 
 
-def _vendor_image(repo: str) -> modal.Image:
+def _vendor_image(repo: str, tag: str) -> modal.Image:
     """A Modal-runnable image from an AssemblyAI ECR image.
 
     Every vendor image needs the same three adjustments: clear the ENTRYPOINT,
@@ -69,14 +70,16 @@ def _vendor_image(repo: str) -> modal.Image:
     """
     return (
         modal.Image.from_aws_ecr(
-            f"{REGISTRY}/{repo}:{TAG}", secret=ecr_secret, add_python="3.12"
+            f"{REGISTRY}/{repo}:{tag}", secret=ecr_secret, add_python="3.12"
         )
         .entrypoint([])
         .pip_install(f"modal=={modal.__version__}")
     )
 
 
-proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy").env(
+proxy_image = _vendor_image(
+    "self-hosted-streaming-license-and-usage-proxy", PROXY_TAG
+).env(
     {
         "HTTP_PORT": str(PROXY_PORT),
         "LOGGING_LEVEL": "INFO",
@@ -84,7 +87,7 @@ proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy").env
         "LICENSE_FILE_PATH": LICENSE_PATH,
     }
 )
-sync_image = _vendor_image("self-hosted-sync-asr-u3-pro")
+sync_image = _vendor_image("self-hosted-sync-asr-u3-pro", SYNC_TAG)
 
 
 # Set by each @modal.exit stop() so the fate-share reaper can tell an intentional
@@ -220,6 +223,11 @@ class SyncApi:
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
                 "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "41943040"),
                 "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),
+                # Loads the forced aligner that backs `timestamps: true`. Off by
+                # default because alignment costs extra GPU time per request.
+                "SYNC_BFA_ALIGNMENT_ENABLED": os.environ.get(
+                    "SYNC_BFA_ALIGNMENT_ENABLED", "false"
+                ),
                 "VLLM_USE_FLASHINFER_SAMPLER": "0",
             },
         )

@@ -17,7 +17,7 @@ import sys
 
 import requests
 
-SYNC_ENDPOINT = "http://localhost:8080/transcribe"
+SYNC_ENDPOINT = "http://localhost:8080/v1/transcribe"
 DEFAULT_AUDIO = pathlib.Path(__file__).parent / "example_audio_file.wav"
 
 
