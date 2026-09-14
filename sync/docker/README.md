@@ -64,7 +64,7 @@ curl -fsS http://localhost:8080/readyz
 an optional `config` JSON part. Accepted audio formats: **16-bit PCM WAV**
 (`audio/wav`) or **raw S16LE PCM** (`audio/pcm`, with `sample_rate` and
 `channels` in the config part) — compressed formats like MP3 are rejected
-with `415`. Audio constraints: 80 ms – 120 s and ≤ 40 MB by default (both
+with `415`. Audio constraints: 80 ms – 1 h and ≤ 1 GiB by default (both
 configurable — see [Audio limits](#audio-limits)), 16-bit, mono or stereo,
 sample rate one of `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
@@ -84,22 +84,26 @@ or reach out to your AssemblyAI contact.
 ## Audio limits
 
 The accepted audio length and request size are controlled by environment
-variables on the `sync-api` container. The compose file passes them through, so
-set them in `.env` (defaults shown):
+variables on the `sync-api` container. They are set in `.env` (copied from
+`.env.example`) and passed through by the compose file, so change them there
+and `docker compose up -d` again. The defaults accept up to 1 hour of 48 kHz
+stereo WAV:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `MAX_AUDIO_DURATION_MS` | `120000` | Longest accepted audio; longer requests return `413`. |
+| `MAX_AUDIO_DURATION_MS` | `3600000` | Longest accepted audio (1 h); longer requests return `413`. |
 | `MIN_AUDIO_DURATION_MS` | `80` | Shortest accepted audio; shorter requests return `400`. |
-| `MAX_REQUEST_BYTES` | `41943040` | Request-body cap; larger requests return `413`. |
-| `INFERENCE_TIMEOUT_SECONDS` | `30` | Per-request inference deadline; requests that exceed it return `504`. |
+| `MAX_REQUEST_BYTES` | `1073741824` | Request-body cap (1 GiB); larger requests return `413`. |
+| `INFERENCE_TIMEOUT_SECONDS` | `300` | Per-request deadline covering upload, decode and inference; requests that exceed it return `504`. |
 
-When raising `MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
+The request-body cap is checked first, on `Content-Length`, so an oversized file
+returns `413` before its duration is ever inspected. When changing
+`MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
 
-- **`MAX_REQUEST_BYTES`** — the 40 MB default fits ~120 s of 48 kHz stereo WAV.
-  Size the cap to your longest audio at your highest sample rate / channel
-  count (`bytes ≈ seconds × sample_rate × channels × 2`, plus a small WAV
-  header).
+- **`MAX_REQUEST_BYTES`** — 1 h of 48 kHz stereo WAV is ~690 MB; 1 h of 16 kHz
+  mono is ~115 MB. Size the cap to your longest audio at your highest sample
+  rate / channel count (`bytes ≈ seconds × sample_rate × channels × 2`, plus a
+  small WAV header).
 - **`INFERENCE_TIMEOUT_SECONDS`** — longer audio takes longer to transcribe,
   especially under concurrent load; raise the deadline to keep long requests
   from timing out.

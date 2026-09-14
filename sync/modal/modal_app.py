@@ -188,7 +188,7 @@ class LicenseProxy:
     max_containers=4,
     scaledown_window=300,
     startup_timeout=900,  # weights load + CUDA-graph capture
-    exit_grace_period=60,  # requests are short (INFERENCE_TIMEOUT_SECONDS below)
+    exit_grace_period=300,  # let in-flight requests finish (INFERENCE_TIMEOUT_SECONDS below)
     secrets=[license_secret],
 )
 class SyncApi:
@@ -212,14 +212,12 @@ class SyncApi:
                 "USE_STRUCTURED_LOGGING": "False",
                 "GPU_MONITORING_ENABLED": "False",
                 "LICENSE_AND_USAGE_PROXY_ENDPOINT": proxy_url,
-                # Audio limits: customer-overridable via the aai-license secret
-                # (or any Server env). User value wins; the compose defaults are
-                # only the fallback. Raising MAX_AUDIO_DURATION_MS usually means
-                # raising MAX_REQUEST_BYTES and INFERENCE_TIMEOUT_SECONDS too.
-                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "120000"),
+                # Audio limits, sized for 1 h of 48 kHz stereo WAV. Customer
+                # values from the aai-license secret (or any Server env) win.
+                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "3600000"),
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
-                "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "41943040"),
-                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),
+                "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "1073741824"),
+                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "300"),
                 "VLLM_USE_FLASHINFER_SAMPLER": "0",
             },
         )
