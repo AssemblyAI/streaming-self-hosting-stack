@@ -41,7 +41,7 @@ def main() -> None:
             ),
         },
         headers={"Authorization": "any value works"},
-        timeout=120,
+        timeout=600,  # above the server's INFERENCE_TIMEOUT_SECONDS default (300)
     )
     response.raise_for_status()
     result = response.json()

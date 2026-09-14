@@ -102,8 +102,10 @@ URL is unguessable but public, so treat it as such.
 
 The audio limits (`MAX_AUDIO_DURATION_MS`, `MIN_AUDIO_DURATION_MS`,
 `MAX_REQUEST_BYTES`, `INFERENCE_TIMEOUT_SECONDS`) are read from the environment
-with the compose defaults as fallback, so you can override them by adding the
-variable to the `aai-license` secret (or any Server env) — your value wins.
+with the compose defaults as fallback (1 h, 80 ms, 1 GiB, 300 s), so you can
+override them by adding the variable to the `aai-license` secret (or any Server
+env) — your value wins. See [Audio limits](../docker/README.md#audio-limits)
+for how the three scale together.
 
 `PROXY_MIN_CONTAINERS` (default `1`) sets how many `LicenseProxy` containers stay
 warm; see [Cost and teardown](#cost-and-teardown) before lowering it. Set it in
