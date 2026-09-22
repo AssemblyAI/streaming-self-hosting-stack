@@ -49,7 +49,8 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 
 ### GPU runtime setup
 
-Verify NVIDIA drivers:
+All GPU images ship CUDA 13 runtime libraries, so the host needs an NVIDIA
+driver that supports CUDA 13 (R580 series or newer). Verify the driver:
 ```bash
 nvidia-smi
 ```
@@ -57,7 +58,7 @@ nvidia-smi
 Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html),
 then verify the Docker runtime has GPU access:
 ```bash
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:13.0.1-base-ubuntu24.04 nvidia-smi
 ```
 
 ### ECR authentication
@@ -135,49 +136,119 @@ until the first successful validation).
 
 ## Changelog
 
-### v1.1.0
+### v1.2.0
+
+#### Streaming API — New Features
+
+- **`acknowledge_silence`** — Opt in to receive a `Silence` message about once
+  per second while no speech is being transcribed, so clients can tell a quiet
+  room apart from a stalled connection (Universal-3.5 Pro).
+- **Heartbeat on Universal English and Multilingual** — The `session_heartbeat`
+  opt-in now works on all three models.
+
+#### Streaming API — Fixes and Improvements
+
+- **Webhook hardening** — `webhook_url` targets on link-local or cloud-metadata
+  addresses are rejected, and delivery no longer follows redirects.
+
+#### Universal-3.5 Pro (streaming)
+
+- **Entity-aware endpointing in all modes** — A turn that ends mid-number,
+  mid-spelling or mid-address is held until it completes, while ordinary
+  sentences still end at the mode's minimum silence.
+- **Retuned mode thresholds** — The three modes now differ mainly in how long
+  they wait for an entity to complete; `max_accuracy` ends ordinary sentences
+  sooner than before.
+- **Repetition-loop guardrails** — Runaway decodes that repeat a phrase dozens
+  of times are collapsed and capped.
+- **Speaker tags stripped** — Bracketed speaker tags no longer leak into
+  transcript words.
+- **13 more languages for `language_codes`** — Korean, Russian, Catalan,
+  Galician, Romanian, Estonian, Persian, Cantonese, Afrikaans, Marathi, Zulu,
+  Xhosa and Norwegian Nynorsk.
+- **No CJK characters on streams pinned to other languages** — Stray Chinese,
+  Japanese or Korean characters are dropped when `language_codes` names only
+  non-CJK languages.
+- **Multilingual sentence-final punctuation** — Turns in Japanese, Chinese,
+  Arabic, Urdu and Hindi end on their native punctuation instead of waiting for
+  the silence timeout.
+- **More robust under load** — Timed-out inference requests are aborted, so
+  overload degrades gracefully instead of failing sessions.
+- **Working container health check** — The compose file's gRPC health probe now
+  reports the container healthy.
+
+#### Universal English and Multilingual ASR
+
+No model change.
+
+- **CUDA 13 runtime** — The host NVIDIA driver must now support CUDA 13 (R580
+  or newer); T4 and newer GPUs remain supported.
+- **Heartbeat support** — See Streaming API above.
+- **Clean exit on fatal worker errors** — The container exits instead of
+  hanging, so the restart policy takes over.
 
 #### Sync — New Features
 
-- **Compressed audio.** `/transcribe` now accepts AAC, MP3, M4A, OGG, WebM, and
+Shipped in `self-hosted-sync-asr-u3-pro:release-v1.1.0` (2026-09-11) and
+carried forward.
+
+- **Compressed audio** — `/transcribe` accepts AAC, MP3, M4A, OGG, WebM and
   FLAC in addition to WAV and raw PCM.
-- **Word timestamps.** Set `"timestamps": true` in the config part for per-word
-  `start`/`end` in milliseconds. Requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on
-  the `sync-api` container; the alignment checkpoint ships in the image.
-- **13 more languages**: Korean, Russian, Catalan, Galician, Romanian,
-  Estonian, Persian, Cantonese, Afrikaans, Marathi, Zulu, Xhosa, and Norwegian
-  Nynorsk.
-- **`GET /warm`** pre-warms a connection ahead of a latency-sensitive request.
-- **`/v1` route prefix.** Sync routes are served at `/v1/...`; the unprefixed
-  paths continue to work, so existing clients need no change.
-- **`keyterms_prompt`** is the preferred name for the keyterms list, matching
-  the streaming API. `keyterms` and `word_boost` are accepted as aliases;
-  passing more than one returns `400`.
+- **Streamed uploads** — `POST /v1/transcribe/live` transcribes while the audio
+  is still uploading (WAV/PCM only).
+- **Word timestamps** — Set `"timestamps": true` for per-word `start`/`end`;
+  requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on the container.
+- **13 more languages** — The same list as streaming above.
+- **Higher config limits** — Longer `prompt`, `keyterms_prompt` and
+  `conversation_context` are accepted.
+- **`GET /warm`** — Pre-warms a connection ahead of a latency-sensitive
+  request.
+- **`/v1` route prefix** — Routes are served at `/v1/...`; unprefixed paths
+  continue to work.
+- **`keyterms_prompt`** — Preferred name for the keyterms list; `keyterms` and
+  `word_boost` remain accepted as aliases.
 
 #### Sync — Fixes and Improvements
 
-- Usage reporting for self-hosted sync is now accepted end to end by the
-  usage-tracker API. On v1.0.0 these reports were rejected, which on
-  usage-based licenses also crash-looped the proxy.
-- Guardrails against runaway decodes (output-token cap, frequency penalty) and
-  a per-chunk hallucination guardrail.
+- Self-hosted usage reports are now accepted end to end; on v1.0.0 they were
+  rejected, which on usage-based licenses also crash-looped the proxy.
+- Guardrails against runaway decodes and hallucinated segments.
 - Bracketed speaker tags no longer leak into transcripts.
-- Prompt handling now preserves explicit language selection, and prompt
-  assembly matches the async Universal-3.5 Pro pipeline.
-- Faster large uploads, faster prompt-budget trimming, and per-stage latency
-  metrics on `/transcribe`.
+- Faster large uploads and faster prompt trimming.
 
-#### Behavior change
+#### Sync — Behavior changes
 
-- Unknown fields in the `config` part are now rejected with `400`. Previously
-  they were ignored, so a misspelled option silently did nothing. Check your
-  config keys before upgrading.
+- Words carry `start`/`end` only when `"timestamps": true` is requested.
+- A caller-supplied `prompt` is added to the language directive instead of
+  replacing it, and an explicit `language_code: "en"` now steers the model;
+  output can differ for these requests.
+- More than 100 keyterms are rejected with `400`.
 
-#### Images
+#### License-and-usage-proxy
 
-`release-v1.1.0` is published for `self-hosted-sync-asr-u3-pro`. All other
-images are unchanged from v1.0.0 — keep `LICENSE_AND_USAGE_PROXY_IMAGE` at
-`release-v1.0.0` (see `sync/docker/.env.example`).
+- No functional changes; rebuilt so every image shares one tag.
+
+#### Also new since v1.0.0
+
+Shipped in the `release-v1.0.1` images but not previously listed:
+
+- **`session_heartbeat`** — Opt in to a periodic `Heartbeat` message
+  (Universal-3.5 Pro).
+- **`encoding=aac`** — AAC audio is accepted alongside PCM and Opus.
+- **End-of-turn details on `Turn`** — Final turns carry `silence_before_eot_ms`
+  and `turn_end_reason` (Universal-3.5 Pro).
+- **Language detection covers every supported language code.**
+- **Faster finals** — Speculative decoding roughly halves time-to-final after a
+  `ForceEndpoint` with no change in accuracy (Universal-3.5 Pro).
+- **Partials every second by default** — Send `continuous_partials=false` for
+  the slower cadence (Universal-3.5 Pro).
+- **English-first start for unsteered streams** — Prevents a first short turn
+  from committing in the wrong language (Universal-3.5 Pro).
+- **`VLLM_ATTENTION_BACKEND` override** — For GPUs the bundled kernels do not
+  cover, such as NVIDIA B200 (Universal-3.5 Pro, Sync).
+- **Bounded session lifetime** — A session whose client stopped sending closes
+  within 60 s, and ASR streams that end without a completion signal are
+  retried.
 
 ### v1.0.0
 

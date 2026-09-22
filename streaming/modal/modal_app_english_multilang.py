@@ -29,13 +29,11 @@ import modal
 
 APP_NAME = "aai-streaming-english-multilang"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-# The English/Multilingual ASR images ship on their own release line, separate
-# from the shared streaming-api and license-and-usage-proxy images.
-ASR_MODEL_TAG = "release-v0.6.0"
-# streaming-api carries the WARNING-not-ERROR handshake-logging fix at v1.0.1
-# (DeepLearning #19523); the license-and-usage-proxy has no v1.0.1.
-API_TAG = "release-v1.0.1"
-PROXY_TAG = "release-v1.0.0"
+# As of v1.2.0 every image in the streaming stack ships on the same release tag
+# (see the Changelog in the top-level README).
+ASR_MODEL_TAG = "release-v1.2.0"
+API_TAG = "release-v1.2.0"
+PROXY_TAG = "release-v1.2.0"
 ASR_GRPC_PORT = 50051
 
 REQUIRE_MODAL_AUTH = os.environ.get("AAI_REQUIRE_MODAL_AUTH", "1") != "0"

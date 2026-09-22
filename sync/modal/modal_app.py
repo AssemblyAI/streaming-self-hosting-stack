@@ -26,8 +26,8 @@ import modal
 
 APP_NAME = "aai-sync-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-SYNC_TAG = "release-v1.1.0"
-PROXY_TAG = "release-v1.0.0"
+SYNC_TAG = "release-v1.2.0"
+PROXY_TAG = "release-v1.2.0"
 
 # The API's public endpoint requires a Modal proxy-auth token by default, so a
 # guessed URL alone cannot reach it. Set to False for a throwaway test endpoint
