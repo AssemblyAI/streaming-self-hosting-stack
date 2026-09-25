@@ -60,26 +60,56 @@ curl -fsS http://localhost:8080/readyz
 
 ## Transcribe
 
-`POST /transcribe` takes `multipart/form-data` with a required `audio` part and
-an optional `config` JSON part. Accepted audio formats: **16-bit PCM WAV**
-(`audio/wav`) or **raw S16LE PCM** (`audio/pcm`, with `sample_rate` and
-`channels` in the config part) — compressed formats like MP3 are rejected
-with `415`. Audio constraints: 80 ms – 120 s and ≤ 40 MB by default (both
-configurable — see [Audio limits](#audio-limits)), 16-bit, mono or stereo,
-sample rate one of `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
+`POST /v1/transcribe` takes `multipart/form-data` with a required `audio` part
+and an optional `config` JSON part. The same routes are also served unprefixed
+(`POST /transcribe`) for clients written against earlier releases; `/v1` is the
+canonical path for new integrations.
+
+Accepted audio formats: **16-bit PCM WAV** (`audio/wav`), **raw S16LE PCM**
+(`audio/pcm`, with `sample_rate` and `channels` in the config part), and the
+compressed formats **AAC, MP3, M4A, OGG, WebM, and FLAC**. Audio constraints:
+80 ms – 120 s and ≤ 40 MB by default (both configurable — see
+[Audio limits](#audio-limits)), 16-bit, mono or stereo, sample rate one of
+`{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
   -F 'config={"language_code":"en"};type=application/json' \
   -H 'Authorization: any value works' \
-  http://localhost:8080/transcribe
+  http://localhost:8080/v1/transcribe
 ```
 
 The optional `config` part also accepts `language_code`, `prompt`,
-`word_boost`, and `conversation_context`. Unknown fields are silently ignored,
-so double-check spelling if an option seems to have no effect. For transcription
-options and further help, see the [AssemblyAI documentation](https://www.assemblyai.com/docs)
-or reach out to your AssemblyAI contact.
+`keyterms_prompt`, `conversation_context`, and `timestamps` (see
+[Word timestamps](#word-timestamps)). `keyterms_prompt` is also accepted as
+`keyterms` or `word_boost`; passing more than one of those names returns `400`.
+Unknown fields are rejected with `400`, so a misspelled option fails loudly
+rather than being ignored. For transcription options and further help, see the
+[AssemblyAI documentation](https://www.assemblyai.com/docs) or reach out to your
+AssemblyAI contact.
+
+`GET /v1/warm` returns `{"warm": "toasty"}` once the model is loaded. Use it to
+pre-warm a connection before a latency-sensitive request; use `/readyz` for
+health and readiness probes.
+
+## Word timestamps
+
+Set `"timestamps": true` in the `config` part to get per-word `start`/`end`
+values in milliseconds alongside each word's `text` and `confidence`.
+
+This requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on the `sync-api` container
+(set it in `.env`). The alignment checkpoint ships inside the image, so no
+extra download is needed, but alignment is off by default because it costs
+extra GPU time on every request that asks for it. With the flag off, a
+`"timestamps": true` request still succeeds — the words simply come back
+without `start`/`end`, so turn the flag on before relying on the field.
+
+```bash
+curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
+  -F 'config={"timestamps":true};type=application/json' \
+  -H 'Authorization: any value works' \
+  http://localhost:8080/v1/transcribe
+```
 
 ## Audio limits
 

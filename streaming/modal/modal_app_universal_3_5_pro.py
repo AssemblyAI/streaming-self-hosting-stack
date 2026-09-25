@@ -30,12 +30,11 @@ import modal
 
 APP_NAME = "aai-streaming-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-# streaming-api and the u3-5-pro ASR ship on release-v1.0.1 (the API image
-# carries the WARNING-not-ERROR handshake-logging fix, DeepLearning #19523);
-# the license-and-usage-proxy has no v1.0.1 and stays on v1.0.0.
-API_TAG = "release-v1.0.1"
-ASR_TAG = "release-v1.0.1"
-PROXY_TAG = "release-v1.0.0"
+# As of v1.2.0 every image in the streaming stack ships on the same release tag
+# (see the Changelog in the top-level README).
+API_TAG = "release-v1.2.0"
+ASR_TAG = "release-v1.2.0"
+PROXY_TAG = "release-v1.2.0"
 ASR_GRPC_PORT = 50051
 
 # See sync/modal/modal_app.py: the WebSocket API requires a Modal proxy-auth token by
