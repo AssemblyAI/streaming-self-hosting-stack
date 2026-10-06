@@ -10,6 +10,7 @@ and, within each service, by **model**.
 |---------|-----------|-----|--------|-----------------|
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
@@ -33,7 +34,7 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 ```
 .
 ├── streaming/
-│   ├── docker/  # compose stack (Universal English/Multilingual, Universal-3.5 Pro)
+│   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.5 Pro, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
 └── sync/
     ├── docker/  # compose stack (Universal-3.5 Pro)
@@ -137,6 +138,29 @@ until the first successful validation).
 ## Changelog
 
 ### v1.2.0
+
+#### Universal-3.6 Pro — New Streaming Stack (added 2026-10-06)
+
+- **New stack** — `streaming/docker/docker-compose.universal-3-6-pro.yml` serves
+  Universal-3.6 Pro from `self-hosted-streaming-asr-universal-3-6-pro:release-v1.2.0`
+  (`STREAMING_ASR_UNIVERSAL_3_6_PRO_IMAGE`). Clients connect with
+  `speech_model=universal-3-6-pro`; `nginx_streaming_asr.conf` routes it to the
+  new `streaming-asr-universal-3-6-pro` backend. A Modal package,
+  `streaming/modal/modal_app_universal_3_6_pro.py`, is included.
+- **Drop-in for Universal-3.5 Pro** — Same connection parameters, messages,
+  modes, and GPU requirements. It runs with the existing `release-v1.2.0`
+  `self-hosted-streaming-api` and `self-hosted-streaming-license-and-usage-proxy`
+  images; nothing else needs upgrading. To switch, bring the Universal-3.5 Pro
+  stack `down`, bring the Universal-3.6 Pro stack `up`, and change the clients'
+  `speech_model`.
+- **`max_accuracy` retuned for the new model** — Compared with Universal-3.5
+  Pro, a turn that ends mid-entity is held for half as long, and an ordinary
+  sentence waits about 0.1 s more silence before it ends. `min_latency` and
+  `balanced` are unchanged.
+- **No stray non-CJK output on streams pinned to CJK languages** — When
+  `language_codes` lists only `zh`, `yue`, `ja`, or `ko`, a decoded segment with
+  letters but no CJK characters is dropped. Segments that contain any CJK
+  character are kept whole, so Latin words inside CJK speech survive.
 
 #### Streaming API — New Features
 
