@@ -157,9 +157,8 @@ stack added on 2026-10-06 (below). If you are still on it:
   `modal_app_universal_3_6_pro.py` (app `aai-streaming-u36pro`) and stop the old
   `aai-streaming-u3pro` app.
 - Connection parameters, messages, mode names, and GPU requirements are
-  unchanged; `max_accuracy` is retuned for the new model (see the
-  Universal-3.6 Pro entry below). The Universal-3.5 Pro streaming features
-  listed in this release carry over to Universal-3.6 Pro.
+  unchanged. The Universal-3.5 Pro streaming features listed in this release
+  carry over to Universal-3.6 Pro.
 
 #### Sync — Universal-3.5 Pro replaced by Universal-3.6 Pro (added 2026-10-14)
 
