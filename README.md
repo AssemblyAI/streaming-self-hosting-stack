@@ -11,6 +11,7 @@ and, within each service, by **model**.
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Diarization** | [`diarization/`](diarization/) | Synchronous HTTP, full-file | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
   stack serves multiple models; the client selects the model per session. See
@@ -18,6 +19,8 @@ and, within each service, by **model**.
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
   ≤ 20 min by default). It is self-contained — a single GPU container plus the
   license-and-usage-proxy, no load balancer. See [`sync/docker/README.md`](sync/docker/README.md).
+- **Diarization** adds speaker labels to a transcript (e.g. the sync response).
+  See [`diarization/docker/README.md`](diarization/docker/README.md).
 
 Each stack is self-contained under `<service>/docker/`: its compose file(s),
 `.env.example`, example client, and `README.md` live together. Run compose
@@ -32,6 +35,8 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 
 ```
 .
+├── diarization/
+│   └── docker/  # compose stack (speaker diarization)
 ├── streaming/
 │   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
@@ -71,7 +76,7 @@ aws ecr get-login-password --region us-west-2 \
 ### License file
 
 Place your AssemblyAI `license.jwt` in the directory of the stack you are
-running (`streaming/docker/` or `sync/docker/`), or point the `LICENSE_FILE_PATH`
+running (`streaming/docker/`, `sync/docker/` or `diarization/docker/`), or point the `LICENSE_FILE_PATH`
 environment variable in that stack's compose file at your license file's location.
 
 ## Shared component: license-and-usage-proxy
@@ -137,6 +142,12 @@ until the first successful validation).
 ## Changelog
 
 ### v1.2.0
+
+#### Diarization — New Self-Hosted Stack (added 2026-10-14)
+
+- **New stack** — [`diarization/docker/`](diarization/docker/) adds speaker labels
+  to a transcript (`self-hosted-diarization:release-v0.2.0`). Use it with
+  `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0`.
 
 #### Streaming — Universal-3.5 Pro stack removed (2026-10-14)
 
