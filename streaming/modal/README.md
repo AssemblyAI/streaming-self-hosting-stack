@@ -7,14 +7,12 @@ with no dependency on any other deployment. Compose equivalents live in
 
 | Stack | File | Servers |
 |---|---|---|
-| Universal-3.5 Pro | `modal_app_universal_3_5_pro.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
 | Universal-3.6 Pro | `modal_app_universal_3_6_pro.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
 | English + Multilingual | `modal_app_english_multilang.py` | `StreamingApi` (CPU), `Lb` (CPU nginx), `AsrEnglish` (L40S), `AsrMultilang` (L40S), `LicenseProxy` (CPU) |
 
 `StreamingApi` resolves its backend and proxy URLs from the same App at startup,
-so there is no manual wiring or two-phase deploy. The Universal-3.5 Pro and
-Universal-3.6 Pro stacks each serve one model and need no router, so nginx is
-dropped. The
+so there is no manual wiring or two-phase deploy. The Universal-3.6 Pro stack
+serves one model and needs no router, so nginx is dropped. The
 English + Multilingual stack serves two models, so it keeps an nginx `Lb` that
 routes the `x-model-version` gRPC metadata (from the client's `speech_model`) to
 the matching backend, exactly as `streaming-asr-lb` does in compose.
@@ -28,14 +26,14 @@ stack shares them.
 ## Deploy
 
 ```bash
-modal deploy modal_app_universal_3_6_pro.py     # or modal_app_universal_3_5_pro.py, modal_app_english_multilang.py
+modal deploy modal_app_universal_3_6_pro.py     # or modal_app_english_multilang.py
 ```
 
 Each GPU backend keeps one L40S warm (`min_containers=1`) and gates readiness on
 `grpc_health_probe`, so the first deploy takes a few minutes to warm the model;
 Modal then autoscales on concurrent sessions, with `target_concurrency` set to
-each stack's `MAX_OPEN_STREAMS` (Universal-3.5 Pro and Universal-3.6 Pro 32,
-English + Multilingual 48, matching compose). The endpoint URLs are printed, of the form
+each stack's `MAX_OPEN_STREAMS` (Universal-3.6 Pro 32, English + Multilingual
+48, matching compose). The endpoint URLs are printed, of the form
 `https://<workspace>--<app>-streamingapi.<region>.modal.direct`.
 
 ## Verify
@@ -58,8 +56,7 @@ python sample_streaming.py \
   --modal-key "$MODAL_KEY" --modal-secret "$MODAL_SECRET"
 ```
 
-For the Universal-3.5 Pro stack use app `aai-streaming-u3pro` and
-`--speech-model universal-3-5-pro`. For the English + Multilingual stack use `--speech-model universal-streaming-english`
+For the English + Multilingual stack use `--speech-model universal-streaming-english`
 or `universal-streaming-multilingual`; the API maps these to the `en-default` /
 `ml-default` routing keys and the `Lb` sends each to its backend. Or use the
 [sample script](#sample-requests).
@@ -124,7 +121,7 @@ Each GPU backend holds an L40S while up (Modal bills it), scaling to at most
 `max_containers` and down after `scaledown_window`. Tear a stack down when done:
 
 ```bash
-modal app stop aai-streaming-u36pro                # or aai-streaming-u3pro, aai-streaming-english-multilang
+modal app stop aai-streaming-u36pro                # or aai-streaming-english-multilang
 ```
 
 Audio is processed on Modal's multi-tenant cloud in the configured region

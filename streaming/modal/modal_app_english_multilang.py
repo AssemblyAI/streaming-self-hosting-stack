@@ -2,7 +2,7 @@
 
 `modal deploy modal_app_english_multilang.py` brings up the whole stack in one
 command. This stack serves TWO ASR models, so unlike the single-model
-Universal-3.5 Pro stack it keeps compose's routing layer: clients pick a model
+Universal-3.6 Pro stack it keeps compose's routing layer: clients pick a model
 with speech_model ("en-default" or "ml-default"), the API forwards it as the
 gRPC metadata x-model-version, and an nginx load balancer routes to the matching
 backend. Five Modal Servers in one App:

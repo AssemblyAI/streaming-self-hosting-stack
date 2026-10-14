@@ -9,7 +9,6 @@ and, within each service, by **model**.
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
@@ -34,7 +33,7 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 ```
 .
 ├── streaming/
-│   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.5 Pro, Universal-3.6 Pro)
+│   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
 └── sync/
     ├── docker/  # compose stack (Universal-3.6 Pro)
@@ -138,6 +137,29 @@ until the first successful validation).
 ## Changelog
 
 ### v1.2.0
+
+#### Streaming — Universal-3.5 Pro stack removed (2026-10-14)
+
+The Universal-3.5 Pro streaming stack is superseded by the Universal-3.6 Pro
+stack added on 2026-10-06 (below). If you are still on it:
+
+- **Compose file removed** — `streaming/docker/docker-compose.universal-3-5-pro.yml`
+  is gone; run `streaming/docker/docker-compose.universal-3-6-pro.yml` instead.
+  Bring the old stack `down` before bringing the new one `up`.
+- **Image env var** — `STREAMING_ASR_UNIVERSAL_3_5_PRO_IMAGE` is no longer read;
+  set `STREAMING_ASR_UNIVERSAL_3_6_PRO_IMAGE` to
+  `344839248844.dkr.ecr.us-west-2.amazonaws.com/self-hosted-streaming-asr-universal-3-6-pro:release-v1.2.0`
+  (see `streaming/docker/.env.example`).
+- **`speech_model` value** — clients must connect with
+  `speech_model=universal-3-6-pro`. `nginx_streaming_asr.conf` no longer routes
+  `universal-3-5-pro`, so sessions requesting it fail.
+- **Modal** — `streaming/modal/modal_app_universal_3_5_pro.py` is removed; deploy
+  `modal_app_universal_3_6_pro.py` (app `aai-streaming-u36pro`) and stop the old
+  `aai-streaming-u3pro` app.
+- Connection parameters, messages, mode names, and GPU requirements are
+  unchanged; `max_accuracy` is retuned for the new model (see the
+  Universal-3.6 Pro entry below). The Universal-3.5 Pro streaming features
+  listed in this release carry over to Universal-3.6 Pro.
 
 #### Sync — Universal-3.5 Pro replaced by Universal-3.6 Pro (added 2026-10-14)
 
