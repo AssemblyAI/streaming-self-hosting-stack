@@ -1,4 +1,4 @@
-"""Run the self-hosted sync (full-file HTTP) stack on Modal as a standalone app.
+"""Run the self-hosted sync (full-file HTTP) Universal-3.6 Pro stack on Modal, standalone.
 
 `modal deploy modal_app.py` brings up the whole stack in one command. Compose's
 two services become two Modal services in one App, so nothing here depends on
@@ -47,7 +47,7 @@ PROXY_MIN_CONTAINERS = int(os.environ.get("PROXY_MIN_CONTAINERS", "1"))
 # prepends an image's ENTRYPOINT to its own runtime command, so both images
 # clear it with .entrypoint([]); otherwise the vendor binary consumes Modal's
 # arguments, starts with default env, and this code never runs.
-SYNC_BIN = "/opt/assemblyai/engineering/projects/realtime/asr_sync_u3pro/self_hosted_bin"
+SYNC_BIN = "/opt/assemblyai/engineering/projects/realtime/asr_sync_u3pro/self_hosted_u3_6_pro_bin"
 PROXY_BIN = "/opt/assemblyai/engineering/projects/realtime/license_and_usage_proxy/bin"
 
 LICENSE_PATH = "/var/aai_license.jwt"
@@ -87,7 +87,7 @@ proxy_image = _vendor_image(
         "LICENSE_FILE_PATH": LICENSE_PATH,
     }
 )
-sync_image = _vendor_image("self-hosted-sync-asr-u3-pro", SYNC_TAG)
+sync_image = _vendor_image("self-hosted-sync-asr-universal-3-6-pro", SYNC_TAG)
 
 
 # Set by each @modal.exit stop() so the fate-share reaper can tell an intentional
@@ -219,9 +219,9 @@ class SyncApi:
                 # (or any Server env). User value wins; the compose defaults are
                 # only the fallback. Raising MAX_AUDIO_DURATION_MS usually means
                 # raising MAX_REQUEST_BYTES and INFERENCE_TIMEOUT_SECONDS too.
-                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "120000"),
+                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "1200000"),
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
-                "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "41943040"),
+                "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "268435456"),
                 "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),
                 # Loads the forced aligner that backs `timestamps: true`. Off by
                 # default because alignment costs extra GPU time per request.

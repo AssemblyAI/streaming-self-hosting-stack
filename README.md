@@ -11,13 +11,13 @@ and, within each service, by **model**.
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
-| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
 - **Streaming** transcribes a live audio stream over a WebSocket connection. One
   stack serves multiple models; the client selects the model per session. See
   [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
-  ≤ 120 s by default). It is self-contained — a single GPU container plus the
+  ≤ 20 min by default). It is self-contained — a single GPU container plus the
   license-and-usage-proxy, no load balancer. See [`sync/docker/README.md`](sync/docker/README.md).
 
 Each stack is self-contained under `<service>/docker/`: its compose file(s),
@@ -37,7 +37,7 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 │   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.5 Pro, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
 └── sync/
-    ├── docker/  # compose stack (Universal-3.5 Pro)
+    ├── docker/  # compose stack (Universal-3.6 Pro)
     └── modal/   # serverless-GPU package
 ```
 
@@ -138,6 +138,33 @@ until the first successful validation).
 ## Changelog
 
 ### v1.2.0
+
+#### Sync — Universal-3.5 Pro replaced by Universal-3.6 Pro (added 2026-10-14)
+
+The sync stack now serves **Universal-3.6 Pro** from
+`self-hosted-sync-asr-universal-3-6-pro:release-v1.2.0`. If you are upgrading
+from the Universal-3.5 Pro sync stack:
+
+- **Compose file renamed** — `sync/docker/docker-compose.universal-3-5-pro.yml`
+  is now `sync/docker/docker-compose.universal-3-6-pro.yml`. Bring the old
+  stack `down` before bringing the new one `up`.
+- **Image changed** — point `SYNC_API_IMAGE` at
+  `self-hosted-sync-asr-universal-3-6-pro:release-v1.2.0` (the variable name is
+  unchanged). The `release-v1.2.0` `self-hosted-streaming-license-and-usage-proxy`
+  image is unchanged.
+- **Drop-in for clients** — Same routes, request and response formats, and
+  config options; no client change is needed. Usage reports are stamped
+  `universal-3-6-pro`.
+- **20-minute audio by default** — The stack now accepts audio up to 20
+  minutes and request bodies up to 256 MB by default
+  (`MAX_AUDIO_DURATION_MS=1200000`, `MAX_REQUEST_BYTES=268435456`, up from
+  120 s / 40 MB). Both remain configurable in `.env`; set the old values to
+  keep the previous limits.
+- **Modal** — `sync/modal/modal_app.py` deploys Universal-3.6 Pro under the
+  same app name (`aai-sync-u3pro`), so `modal deploy` upgrades an existing
+  deployment in place. The image repository changed, so that deploy pulls and
+  converts a new image; refresh the `aai-ecr-credentials` secret first if its
+  session credentials have expired.
 
 #### Universal-3.6 Pro — New Streaming Stack (added 2026-10-06)
 

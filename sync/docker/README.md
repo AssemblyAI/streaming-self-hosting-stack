@@ -1,14 +1,14 @@
 # Sync (synchronous HTTP) self-hosted stack
 
-Synchronous full-file transcription on Universal-3.5 Pro: POST audio, get the entire
-transcript back in one HTTP response. Run all commands from this `sync/`
+Synchronous full-file transcription on Universal-3.6 Pro: POST audio, get the entire
+transcript back in one HTTP response. Run all commands from this `sync/docker/`
 directory.
 
 > Prerequisites (license, Docker, GPU runtime, ECR auth) and the shared
 > license-and-usage-proxy (usage reporting, license status endpoint, proxy
 > production recommendations) are documented in the [top-level README](../../README.md).
 
-The stack (`docker-compose.universal-3-5-pro.yml`) runs two containers — `sync-api`
+The stack (`docker-compose.universal-3-6-pro.yml`) runs two containers — `sync-api`
 (GPU) and `license-and-usage-proxy` — with no nginx load balancer and no
 separate ASR backend. Authentication and rate limiting are expected to be
 handled at your own infrastructure layer (reverse proxy / API gateway); the
@@ -18,7 +18,7 @@ header returns `401`, so make sure your proxy doesn't strip it.
 
 | File | API | Models served | GPU requirement |
 |------|-----|--------------|-----------------|
-| `docker-compose.universal-3-5-pro.yml` | Sync (synchronous HTTP) | Universal-3.5 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| `docker-compose.universal-3-6-pro.yml` | Sync (synchronous HTTP) | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 
 ## Setup
 
@@ -35,11 +35,11 @@ Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in th
 ## Run
 
 ```bash
-docker compose -f docker-compose.universal-3-5-pro.yml up -d
-docker compose -f docker-compose.universal-3-5-pro.yml logs -f
+docker compose -f docker-compose.universal-3-6-pro.yml up -d
+docker compose -f docker-compose.universal-3-6-pro.yml logs -f
 
 # Stop
-docker compose -f docker-compose.universal-3-5-pro.yml down
+docker compose -f docker-compose.universal-3-6-pro.yml down
 ```
 
 The `sync-api` container is ready once the model is warm (cold start can take a
@@ -68,7 +68,7 @@ canonical path for new integrations.
 Accepted audio formats: **16-bit PCM WAV** (`audio/wav`), **raw S16LE PCM**
 (`audio/pcm`, with `sample_rate` and `channels` in the config part), and the
 compressed formats **AAC, MP3, M4A, OGG, WebM, and FLAC**. Audio constraints:
-80 ms – 120 s and ≤ 40 MB by default (both configurable — see
+80 ms – 20 min and ≤ 256 MB by default (both configurable — see
 [Audio limits](#audio-limits)), 16-bit, mono or stereo, sample rate one of
 `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
@@ -119,14 +119,14 @@ set them in `.env` (defaults shown):
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `MAX_AUDIO_DURATION_MS` | `120000` | Longest accepted audio; longer requests return `413`. |
+| `MAX_AUDIO_DURATION_MS` | `1200000` | Longest accepted audio (20 min); longer requests return `413`. |
 | `MIN_AUDIO_DURATION_MS` | `80` | Shortest accepted audio; shorter requests return `400`. |
-| `MAX_REQUEST_BYTES` | `41943040` | Request-body cap; larger requests return `413`. |
+| `MAX_REQUEST_BYTES` | `268435456` | Request-body cap (256 MB); larger requests return `413`. |
 | `INFERENCE_TIMEOUT_SECONDS` | `30` | Per-request inference deadline; requests that exceed it return `504`. |
 
 When raising `MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
 
-- **`MAX_REQUEST_BYTES`** — the 40 MB default fits ~120 s of 48 kHz stereo WAV.
+- **`MAX_REQUEST_BYTES`** — the 256 MB default fits ~20 min of 48 kHz stereo WAV.
   Size the cap to your longest audio at your highest sample rate / channel
   count (`bytes ≈ seconds × sample_rate × channels × 2`, plus a small WAV
   header).
@@ -163,7 +163,7 @@ for the license-and-usage-proxy.
 
 ### sync-api service
 
-- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000. The model weights use ~11 GB of VRAM; the remaining VRAM becomes vLLM KV cache and sets max concurrency (e.g. ~74 concurrent max-length requests on 96 GB — more VRAM, higher concurrency). Allow ~30 GB of disk for the ~23 GB Docker image plus working space.
+- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000. The model weights use ~11 GB of VRAM; the remaining VRAM becomes vLLM KV cache and sets max concurrency (e.g. ~74 concurrent 120 s requests on 96 GB — more VRAM, higher concurrency; a request's KV footprint grows with its audio length, so fewer 20-minute requests fit at once). Allow ~50 GB of disk for the ~38 GB Docker image (13.8 GB compressed pull) plus working space.
 - **Deployment Strategy**: Sync requests are short-lived HTTP calls, so rolling deployments work well. Drain in-flight requests before stopping a container.
 - **Scaling**: The load signal that matters is concurrent in-flight `/transcribe` requests (equivalently, the total in-flight audio duration) — this is what fills the GPU KV cache. Scale out before the container saturates; once vLLM's queue backs up, latency climbs sharply. A container's capacity is bounded by KV-cache headroom (and thus GPU VRAM), so load-test your specific GPU to find the concurrency at which latency degrades, and set that as your scale-out threshold.
 - **Authentication & rate limiting**: Handle these at your own reverse proxy / API gateway — the service does not validate credentials (though every request must carry a non-empty `Authorization` header).
