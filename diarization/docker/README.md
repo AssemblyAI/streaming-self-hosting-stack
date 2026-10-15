@@ -39,9 +39,14 @@ docker compose -f docker-compose.diarization.yml down
 ```
 
 The host ports are `8090` (diarization) and `8092` (proxy), so the stack can run
-next to the sync stack on one host.
+next to the sync stack on one host. The compose files set the project names
+`diarization` and `sync`, so each stack keeps its own proxy.
 
 ## Verify
+
+Use `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0` or newer.
+Older proxies reject diarization usage reports with a 422, so the proxy does
+not record usage. The diarize requests continue to work.
 
 ```bash
 curl -fsS http://localhost:8092/v1/status   # license proxy state

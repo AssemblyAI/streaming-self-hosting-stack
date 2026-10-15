@@ -5,6 +5,10 @@
 #
 # POST audio + transcript to http://localhost:8090/v1/diarize (see README).
 
+# The project name keeps this stack apart from the sync stack. Both files are in
+# a docker/ directory and both have a license-and-usage-proxy service.
+name: diarization
+
 services:
   diarization-api:
     image: ${DIARIZATION_API_IMAGE}
