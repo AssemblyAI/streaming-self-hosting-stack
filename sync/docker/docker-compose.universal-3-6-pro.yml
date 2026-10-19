@@ -10,6 +10,10 @@
 #
 # POST audio to http://localhost:8080/transcribe (see README + example/).
 
+# The project name keeps this stack apart from the diarization stack. Both files
+# are in a docker/ directory and both have a license-and-usage-proxy service.
+name: sync
+
 services:
   sync-api:
     image: ${SYNC_API_IMAGE}
