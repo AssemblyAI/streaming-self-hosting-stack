@@ -148,6 +148,9 @@ until the first successful validation).
 - **New stack** — [`diarization/docker/`](diarization/docker/) adds speaker labels
   to a transcript (`self-hosted-diarization:release-v0.2.0`). Use it with
   `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0`.
+- **Sync + diarization stack** — `diarization/docker/docker-compose.sync-diarization.yml`
+  runs sync and diarization with one license-and-usage-proxy and one license
+  file (added 2026-10-19).
 - **Sync project name** — `sync/docker/docker-compose.universal-3-6-pro.yml`
   now sets the Compose project name `sync` (it was `docker`), so the sync and
   diarization stacks do not share a proxy. Stop a running sync stack before you

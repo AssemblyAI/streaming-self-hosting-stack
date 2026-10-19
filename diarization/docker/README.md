@@ -15,6 +15,7 @@ header** (any value works).
 | File | API | Model | GPU requirement |
 |------|-----|-------|-----------------|
 | `docker-compose.diarization.yml` | Diarization (synchronous HTTP) | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
+| `docker-compose.sync-diarization.yml` | Sync + diarization | Universal-3.6 Pro + speaker diarization | One GPU for both (as for sync), or one GPU each |
 
 ## Setup
 
@@ -41,6 +42,24 @@ docker compose -f docker-compose.diarization.yml down
 The host ports are `8090` (diarization) and `8092` (proxy), so the stack can run
 next to the sync stack on one host. The compose files set the project names
 `diarization` and `sync`, so each stack keeps its own proxy.
+
+## Run with sync
+
+`docker-compose.sync-diarization.yml` runs sync, diarization and one
+license-and-usage-proxy with one `license.jwt`. Sync word timestamps are on
+(`SYNC_BFA_ALIGNMENT_ENABLED=true`), so its response posts to `/v1/diarize` as is.
+Run it instead of the two standalone stacks, not with them: it uses the same
+host ports.
+
+```bash
+# In .env, also set SYNC_API_IMAGE (see .env.example)
+docker compose -f docker-compose.sync-diarization.yml up -d
+```
+
+Both services use GPU 0. On a host with two GPUs, set `DIARIZATION_GPU=1`. The
+sync limits use a `SYNC_` prefix in `.env` (for example
+`SYNC_MAX_AUDIO_DURATION_MS`); the defaults are the same as in
+[`sync/docker/`](../../sync/docker/).
 
 ## Verify
 
