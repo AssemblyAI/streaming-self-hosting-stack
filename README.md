@@ -22,6 +22,9 @@ and, within each service, by **model**.
 - **Diarization** adds speaker labels to a transcript (e.g. the sync response).
   See [`diarization/docker/README.md`](diarization/docker/README.md).
 
+[`examples/`](examples/) combines services: [`examples/sync-diarization/`](examples/sync-diarization/)
+runs sync and diarization with one license-and-usage-proxy.
+
 Each stack is self-contained under `<service>/docker/`: its compose file(s),
 `.env.example`, example client, and `README.md` live together. Run compose
 commands from inside that directory.
@@ -37,6 +40,8 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 .
 ├── diarization/
 │   └── docker/  # compose stack (speaker diarization)
+├── examples/
+│   └── sync-diarization/  # sync + diarization with one proxy
 ├── streaming/
 │   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
@@ -148,6 +153,9 @@ until the first successful validation).
 - **New stack** — [`diarization/docker/`](diarization/docker/) adds speaker labels
   to a transcript (`self-hosted-diarization:release-v0.2.0`). Use it with
   `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0`.
+- **Sync + diarization example** — [`examples/sync-diarization/`](examples/sync-diarization/)
+  runs sync and diarization with one license-and-usage-proxy and one license
+  file (added 2026-10-21).
 - **Sync project name** — `sync/docker/docker-compose.universal-3-6-pro.yml`
   now sets the Compose project name `sync` (it was `docker`), so the sync and
   diarization stacks do not share a proxy. Stop a running sync stack before you

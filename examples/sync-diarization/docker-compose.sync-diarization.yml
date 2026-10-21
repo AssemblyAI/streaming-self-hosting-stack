@@ -1,0 +1,121 @@
+# Self-hosted sync + speaker diarization in one stack, with one
+# license-and-usage-proxy and one license file.
+#
+# Sync transcribes with word timestamps on; POST its response and the same audio
+# to diarization to get speaker labels (see README.md).
+#
+# Usage (run from the examples/sync-diarization/ directory):
+#   docker compose -f docker-compose.sync-diarization.yml up -d
+#
+# Sync:        http://localhost:8080/v1/transcribe
+# Diarization: http://localhost:8090/v1/diarize
+
+# Its own project name, so it does not share containers with the standalone
+# sync or diarization stacks. Run this stack instead of those two, not with them.
+name: sync-diarization
+
+services:
+  sync-api:
+    image: ${SYNC_API_IMAGE}
+    ports:
+      - "8080:8080"
+    environment:
+      - HTTP_PORT=8080
+      - AAI_ENV=production
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      # GPU monitoring emits to CloudWatch; off in self-hosted deployments.
+      - GPU_MONITORING_ENABLED=False
+      - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      # Sync audio limits. The SYNC_ prefix keeps them apart from the
+      # diarization limits below (see README.md).
+      - MAX_AUDIO_DURATION_MS=${SYNC_MAX_AUDIO_DURATION_MS:-1200000}
+      - MIN_AUDIO_DURATION_MS=${SYNC_MIN_AUDIO_DURATION_MS:-80}
+      - MAX_REQUEST_BYTES=${SYNC_MAX_REQUEST_BYTES:-268435456}
+      - INFERENCE_TIMEOUT_SECONDS=${SYNC_INFERENCE_TIMEOUT_SECONDS:-30}
+      # Diarization needs per-word start/end, which come from forced alignment.
+      - SYNC_BFA_ALIGNMENT_ENABLED=${SYNC_BFA_ALIGNMENT_ENABLED:-true}
+      # Required on newer GPUs (e.g. Blackwell); see ../../sync/docker/.
+      - VLLM_USE_FLASHINFER_SAMPLER=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 300s
+    depends_on:
+      - license-and-usage-proxy
+    networks:
+      - sync-diarization-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # Both services use GPU 0 by default. On a host with two GPUs, set
+              # DIARIZATION_GPU=1 to give each service its own.
+              device_ids: ["${SYNC_GPU:-0}"]
+              capabilities: ["gpu"]
+
+  diarization-api:
+    image: ${DIARIZATION_API_IMAGE}
+    ports:
+      - "8090:8080"
+    environment:
+      - HTTP_PORT=8080
+      - AAI_ENV=production
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
+      # Diarization limits, the same as ../../diarization/docker/.
+      - MAX_AUDIO_DURATION_MS=${MAX_AUDIO_DURATION_MS:-3600000}
+      - MAX_REQUEST_BYTES=${MAX_REQUEST_BYTES:-1073741824}
+      - INFERENCE_TIMEOUT_SECONDS=${INFERENCE_TIMEOUT_SECONDS:-300}
+      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-1}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 2s
+      retries: 3
+      start_period: 300s
+    depends_on:
+      - license-and-usage-proxy
+    networks:
+      - sync-diarization-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${DIARIZATION_GPU:-0}"]
+              capabilities: ["gpu"]
+
+  # One proxy validates the license for both services and reports the usage of
+  # both.
+  license-and-usage-proxy:
+    image: ${LICENSE_AND_USAGE_PROXY_IMAGE}
+    ports:
+      - "8092:8080"
+    environment:
+      - HTTP_PORT=8080
+      - LOGGING_LEVEL=INFO
+      - USE_STRUCTURED_LOGGING=False
+      - LICENSE_FILE_PATH=/var/aai_license.jwt
+      - USAGE_TRACKING_API_KEY=${USAGE_TRACKING_API_KEY} # Set if license is for usage-based billing
+    volumes:
+      - ./license.jwt:/var/aai_license.jwt:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 2
+      start_period: 10s
+    networks:
+      - sync-diarization-network
+
+networks:
+  sync-diarization-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
