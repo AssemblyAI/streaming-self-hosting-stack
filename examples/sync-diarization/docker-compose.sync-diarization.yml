@@ -2,9 +2,9 @@
 # license-and-usage-proxy and one license file.
 #
 # Sync transcribes with word timestamps on; POST its response and the same audio
-# to diarization to get speaker labels (see example/transcribe_and_diarize.py).
+# to diarization to get speaker labels (see README.md).
 #
-# Usage (run from the diarization/docker/ directory):
+# Usage (run from the examples/sync-diarization/ directory):
 #   docker compose -f docker-compose.sync-diarization.yml up -d
 #
 # Sync:        http://localhost:8080/v1/transcribe
@@ -28,14 +28,14 @@ services:
       - GPU_MONITORING_ENABLED=False
       - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
       # Sync audio limits. The SYNC_ prefix keeps them apart from the
-      # diarization limits below (see "Run with sync" in the README).
+      # diarization limits below (see README.md).
       - MAX_AUDIO_DURATION_MS=${SYNC_MAX_AUDIO_DURATION_MS:-1200000}
       - MIN_AUDIO_DURATION_MS=${SYNC_MIN_AUDIO_DURATION_MS:-80}
       - MAX_REQUEST_BYTES=${SYNC_MAX_REQUEST_BYTES:-268435456}
       - INFERENCE_TIMEOUT_SECONDS=${SYNC_INFERENCE_TIMEOUT_SECONDS:-30}
       # Diarization needs per-word start/end, which come from forced alignment.
       - SYNC_BFA_ALIGNMENT_ENABLED=${SYNC_BFA_ALIGNMENT_ENABLED:-true}
-      # Required on newer GPUs (e.g. Blackwell); see sync/docker/.
+      # Required on newer GPUs (e.g. Blackwell); see ../../sync/docker/.
       - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -67,7 +67,7 @@ services:
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
       - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
-      # Diarization limits, the same as docker-compose.diarization.yml.
+      # Diarization limits, the same as ../../diarization/docker/.
       - MAX_AUDIO_DURATION_MS=${MAX_AUDIO_DURATION_MS:-3600000}
       - MAX_REQUEST_BYTES=${MAX_REQUEST_BYTES:-1073741824}
       - INFERENCE_TIMEOUT_SECONDS=${INFERENCE_TIMEOUT_SECONDS:-300}
