@@ -14,7 +14,8 @@ Tear down: modal app stop aai-sync-u3pro
 Prerequisites (see README "Deploying on Modal"):
   modal secret create aai-ecr-credentials AWS_ACCESS_KEY_ID=... \
       AWS_SECRET_ACCESS_KEY=... AWS_SESSION_TOKEN=... AWS_REGION=us-west-2
-  modal secret create aai-license LICENSE_JWT="$(cat license.jwt)"   # +USAGE_TRACKING_API_KEY if usage-billed
+  modal secret create aai-license LICENSE_JWT="$(cat license.jwt)" \
+      USAGE_TRACKING_API_KEY=...   # usage-based licenses only
 """
 
 import os
