@@ -87,6 +87,7 @@ STREAMING_ASR_UNIVERSAL_3_6_PRO_IMAGE=<CUSTOM_IMAGE>
 ```
 
 Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in the compose file).
+If your license uses usage-based billing, also set `USAGE_TRACKING_API_KEY` in `.env` to any API key from your AssemblyAI dashboard, or the license-and-usage-proxy shuts down at startup (see [Usage reporting](../../README.md#usage-reporting)).
 
 ## Run
 

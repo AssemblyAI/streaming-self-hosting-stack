@@ -27,6 +27,7 @@ cp .env.example .env
 ```
 
 Place your `license.jwt` in this directory.
+If your license uses usage-based billing, also set `USAGE_TRACKING_API_KEY` in `.env` to any API key from your AssemblyAI dashboard, or the license-and-usage-proxy shuts down at startup (see [Usage reporting](../../README.md#usage-reporting)).
 
 ## Run
 

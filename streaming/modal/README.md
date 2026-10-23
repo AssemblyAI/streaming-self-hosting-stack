@@ -21,7 +21,9 @@ the matching backend, exactly as `streaming-asr-lb` does in compose.
 
 Identical to the [sync stack](../../sync/modal/README.md#store-credentials-as-modal-secrets):
 create the `aai-ecr-credentials` and `aai-license` Modal secrets once; every
-stack shares them.
+stack shares them. If your license uses usage-based billing, include
+`USAGE_TRACKING_API_KEY` (any API key from your AssemblyAI dashboard) in the
+`aai-license` secret, or the license-and-usage-proxy shuts down at startup.
 
 ## Deploy
 

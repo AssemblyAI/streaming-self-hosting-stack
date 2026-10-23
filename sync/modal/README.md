@@ -41,9 +41,13 @@ modal secret create aai-ecr-credentials \
   AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_SESSION_TOKEN=... \
   AWS_REGION=us-west-2
 
-# The license itself. Usage-billed licenses: add USAGE_TRACKING_API_KEY here
-# too; it reaches the proxy automatically, no code change.
-modal secret create aai-license LICENSE_JWT="$(cat license.jwt)"
+# The license itself. Usage-based licenses also need USAGE_TRACKING_API_KEY (any
+# API key from your AssemblyAI dashboard), or the license-and-usage-proxy shuts
+# down at startup; it reaches the proxy automatically, no code change.
+# Flat-billing licenses can leave it out.
+modal secret create aai-license \
+  LICENSE_JWT="$(cat license.jwt)" \
+  USAGE_TRACKING_API_KEY=...
 ```
 
 Both streaming stacks share these same two secrets.

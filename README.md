@@ -79,6 +79,10 @@ Place your AssemblyAI `license.jwt` in the directory of the stack you are
 running (`streaming/docker/`, `sync/docker/` or `diarization/docker/`), or point the `LICENSE_FILE_PATH`
 environment variable in that stack's compose file at your license file's location.
 
+If your license uses usage-based billing, also set `USAGE_TRACKING_API_KEY` to any API key from your
+AssemblyAI dashboard: in `.env` for Docker, or in the `aai-license` secret for Modal. Without it, the
+license-and-usage-proxy shuts down at startup (see [Usage reporting](#usage-reporting)).
+
 ## Shared component: license-and-usage-proxy
 
 Every service runs the **license-and-usage-proxy** alongside it. It validates
