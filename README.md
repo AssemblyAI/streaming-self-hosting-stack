@@ -28,15 +28,17 @@ commands from inside that directory.
 
 Each stack can also run on serverless GPUs instead of hardware you manage. Every
 stack is a self-contained Modal App deployed with a single `modal deploy` — see
-[`sync/modal/`](sync/modal/) and
-[`streaming/modal/`](streaming/modal/).
+[`sync/modal/`](sync/modal/),
+[`streaming/modal/`](streaming/modal/) and
+[`diarization/modal/`](diarization/modal/).
 
 ## Repository layout
 
 ```
 .
 ├── diarization/
-│   └── docker/  # compose stack (speaker diarization)
+│   ├── docker/  # compose stack (speaker diarization)
+│   └── modal/   # serverless-GPU package
 ├── streaming/
 │   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
 │   └── modal/   # serverless-GPU packages
@@ -152,6 +154,8 @@ until the first successful validation).
 - **New stack** — [`diarization/docker/`](diarization/docker/) adds speaker labels
   to a transcript (`self-hosted-diarization:release-v0.2.0`). Use it with
   `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0`.
+- **Modal** — [`diarization/modal/`](diarization/modal/) deploys the diarization
+  stack on Modal (app `aai-diarization`) (added 2026-10-26).
 - **Sync project name** — `sync/docker/docker-compose.universal-3-6-pro.yml`
   now sets the Compose project name `sync` (it was `docker`), so the sync and
   diarization stacks do not share a proxy. Stop a running sync stack before you

@@ -88,3 +88,8 @@ pip install -r requirements.txt
 python transcribe_and_diarize.py                    # uses the sync example audio file
 python transcribe_and_diarize.py path/to/audio.wav  # or your own audio
 ```
+
+## Deploying on Modal (serverless GPU)
+
+This stack also runs on Modal's serverless GPUs as a self-contained,
+single-`modal deploy` Modal App. See [`../modal/`](../modal/).
