@@ -152,10 +152,14 @@ until the first successful validation).
 
 ### v1.2.0
 
+#### Diarization v0.2.1 (2026-11-02)
+
+- Bump `self-hosted-diarization` to `release-v0.2.1`.
+
 #### Diarization — New Self-Hosted Stack (added 2026-10-14)
 
 - **New stack** — [`diarization/docker/`](diarization/docker/) adds speaker labels
-  to a transcript (`self-hosted-diarization:release-v0.2.0`). Use it with
+  to a transcript (`self-hosted-diarization:release-v0.2.1`). Use it with
   `self-hosted-streaming-license-and-usage-proxy:release-v1.3.0`.
 - **Sync + diarization example** — [`examples/sync-diarization/`](examples/sync-diarization/)
   runs sync and diarization with one license-and-usage-proxy and one license
