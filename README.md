@@ -152,6 +152,14 @@ until the first successful validation).
 
 ### v1.2.0
 
+#### Sync health check (2026-11-06)
+
+- The `sync-api` health check now calls the image's bundled Python instead of
+  `curl`, in `sync/docker/` and `examples/sync-diarization/`. Upcoming sync
+  images no longer ship `curl`. Current images work with either check. If you
+  run sync under your own orchestrator, use an HTTP probe on `/readyz` or the
+  same Python command.
+
 #### Diarization v0.2.1 (2026-11-02)
 
 - Bump `self-hosted-diarization` to `release-v0.2.1`.
