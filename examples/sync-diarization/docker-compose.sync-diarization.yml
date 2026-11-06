@@ -38,7 +38,7 @@ services:
       # Required on newer GPUs (e.g. Blackwell); see ../../sync/docker/.
       - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      test: ["CMD", "/opt/python/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz', timeout=2)"]
       interval: 10s
       timeout: 2s
       retries: 3
