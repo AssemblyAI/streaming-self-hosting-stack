@@ -43,8 +43,9 @@ docker compose -f docker-compose.universal-3-6-pro.yml logs -f
 docker compose -f docker-compose.universal-3-6-pro.yml down
 ```
 
-The `sync-api` container is ready once the model is warm. A cold start takes 15
-to 25 minutes while weights load and the engine compiles and warms up. It exposes
+The `sync-api` container is ready once the model is warm. Every start takes about
+10 to 25 minutes, depending on the GPU and the CPU count, while weights load and
+the engine compiles and warms up. Give the container at least 8 CPUs. It exposes
 `GET /readyz` (returns `200` once warm, `503` during cold start), which the
 container uses as its Docker healthcheck — point your load balancer's readiness
 probe at it so requests are only routed once the model is warm.
@@ -69,7 +70,7 @@ canonical path for new integrations.
 Accepted audio formats: **16-bit PCM WAV** (`audio/wav`), **raw S16LE PCM**
 (`audio/pcm`, with `sample_rate` and `channels` in the config part), and the
 compressed formats **AAC, MP3, M4A, OGG, WebM, and FLAC**. Audio constraints:
-80 ms – 2 h and ≤ 256 MB by default (both configurable — see
+80 ms – 1 h and ≤ 256 MB by default (both configurable — see
 [Audio limits](#audio-limits)), 16-bit, mono or stereo, sample rate one of
 `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
@@ -98,9 +99,9 @@ health and readiness probes.
 Set `"timestamps": true` in the `config` part to get per-word `start`/`end`
 values in milliseconds alongside each word's `text` and `confidence`.
 
-Timestamps are on in every image from `release-v1.3.0`, with no extra setting
-and no added latency. `SYNC_BFA_ALIGNMENT_ENABLED` is no longer used, so remove
-it from your `.env`.
+From `release-v1.3.0`, no container setting is needed. Timestamps are off
+unless the request sets `"timestamps": true`, and timing words adds a small
+latency cost under load.
 
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \
@@ -117,10 +118,10 @@ set them in `.env` (defaults shown):
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `MAX_AUDIO_DURATION_MS` | `7200000` | Longest accepted audio (2 h); longer requests return `413`. |
+| `MAX_AUDIO_DURATION_MS` | `3600000` | Longest accepted audio (1 h); longer requests return `413`. |
 | `MIN_AUDIO_DURATION_MS` | `80` | Shortest accepted audio; shorter requests return `400`. |
 | `MAX_REQUEST_BYTES` | `268435456` | Request-body cap (256 MB); larger requests return `413`. |
-| `INFERENCE_TIMEOUT_SECONDS` | `30` | Per-request inference deadline; requests that exceed it return `504`. |
+| `INFERENCE_TIMEOUT_SECONDS` | `300` | Per-request deadline, including the upload; requests that exceed it return `504`. |
 
 When raising `MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
 
@@ -132,9 +133,8 @@ When raising `MAX_AUDIO_DURATION_MS`, adjust the other limits to match:
   especially under concurrent load; raise the deadline to keep long requests
   from timing out.
 
-Longer audio also consumes proportionally more GPU KV cache while in flight,
-which lowers the request concurrency a container can sustain (see
-[Scaling](#sync-api-service)). Load-test at your chosen limit before relying on
+Longer audio also holds one of the container's request slots for longer, which
+lowers the throughput a container can sustain (see [Scaling](#sync-api-service)). Load-test at your chosen limit before relying on
 it in production.
 
 ## Running the sync example
@@ -161,9 +161,9 @@ for the license-and-usage-proxy.
 
 ### sync-api service
 
-- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000. The model weights use ~11 GB of VRAM; the remaining VRAM becomes vLLM KV cache and sets max concurrency (e.g. ~74 concurrent 120 s requests on 96 GB — more VRAM, higher concurrency; a request's KV footprint grows with its audio length, so fewer 20-minute requests fit at once). Allow ~50 GB of disk for the ~38 GB Docker image (13.8 GB compressed pull) plus working space.
+- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000, and at least 8 CPUs. The container uses about 25 GB of GPU memory, but needs about 90% of the GPU free when it starts, so do not share the GPU with another service that starts first. Allow ~55 GB of disk for the ~41 GB Docker image (~16 GB compressed pull) plus working space.
 - **Deployment Strategy**: Sync requests are short-lived HTTP calls, so rolling deployments work well. Drain in-flight requests before stopping a container.
-- **Scaling**: The load signal that matters is concurrent in-flight `/transcribe` requests (equivalently, the total in-flight audio duration) — this is what fills the GPU KV cache. Scale out before the container saturates; once vLLM's queue backs up, latency climbs sharply. A container's capacity is bounded by KV-cache headroom (and thus GPU VRAM), so load-test your specific GPU to find the concurrency at which latency degrades, and set that as your scale-out threshold.
+- **Scaling**: A container serves up to 16 requests at once. A request beyond that waits up to 10 s for a slot and then returns `503` with `capacity_exceeded`. More GPU memory does not raise this limit, so scale by adding containers, using concurrent in-flight `/transcribe` requests as the signal.
 - **Authentication & rate limiting**: Handle these at your own reverse proxy / API gateway — the service does not validate credentials (though every request must carry a non-empty `Authorization` header).
 - **Health Checks**: Use `GET /readyz` (200 once warm) as the target-group health check; `GET /healthz` is always 200.
 - **Monitoring**: Monitor logs during deployment and watch for warning-level messages.

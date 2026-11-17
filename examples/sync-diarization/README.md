@@ -10,8 +10,11 @@ license-and-usage-proxy and one `license.jwt`. Run all commands from this
 > [top-level README](../../README.md).
 
 The stack runs three containers: `sync-api` (GPU), `diarization-api` (GPU) and
-`license-and-usage-proxy`. Sync returns word timestamps when the request
-sets `"timestamps": true`, so the sync response posts to `/v1/diarize` as is.
+`license-and-usage-proxy`. Ask sync for word timestamps (`"timestamps": true`),
+and its response posts to `/v1/diarize` as is. Both services accept up to 1 hour
+of audio by default. Sync needs about 90% of the GPU free when it starts, so on
+one GPU `diarization-api` waits until `sync-api` is ready; set `DIARIZATION_GPU=1`
+on a host with two GPUs.
 
 ## Setup
 

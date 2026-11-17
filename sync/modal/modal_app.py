@@ -181,17 +181,17 @@ class LicenseProxy:
 @app.server(
     image=sync_image,
     gpu="L40S",
-    cpu=4,
+    cpu=8,  # the boot-time compile runs one worker per CPU, up to 8
     memory=16384,
     port=SYNC_PORT,
     unauthenticated=not REQUIRE_MODAL_AUTH,
     # Scale-out signal: concurrent in-flight /transcribe requests (GPU-bound).
     # Start conservative and tune against bench/harness.py on your hardware.
     target_concurrency=8,
-    min_containers=1,  # 15-25 min cold start; keep one warm (503 while cold)
+    min_containers=1,  # ~10-25 min cold start; keep one warm (503 while cold)
     max_containers=4,
     scaledown_window=300,
-    startup_timeout=1800,  # weights load, compile + CUDA-graph capture
+    startup_timeout=3600,  # weights load, compile + CUDA-graph capture
     exit_grace_period=60,  # requests are short (INFERENCE_TIMEOUT_SECONDS below)
     secrets=[license_secret],
 )
@@ -220,14 +220,13 @@ class SyncApi:
                 # (or any Server env). User value wins; the compose defaults are
                 # only the fallback. Raising MAX_AUDIO_DURATION_MS usually means
                 # raising MAX_REQUEST_BYTES and INFERENCE_TIMEOUT_SECONDS too.
-                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "7200000"),
+                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "3600000"),
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
                 "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "268435456"),
-                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),
-                "VLLM_USE_FLASHINFER_SAMPLER": "0",
+                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "300"),
             },
         )
-        _wait_http_ok(f"http://localhost:{SYNC_PORT}/readyz", 1740)
+        _wait_http_ok(f"http://localhost:{SYNC_PORT}/readyz", 3540)
 
     @modal.exit()
     def stop(self) -> None:
