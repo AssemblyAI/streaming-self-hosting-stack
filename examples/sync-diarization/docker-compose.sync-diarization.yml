@@ -33,16 +33,14 @@ services:
       - MIN_AUDIO_DURATION_MS=${SYNC_MIN_AUDIO_DURATION_MS:-80}
       - MAX_REQUEST_BYTES=${SYNC_MAX_REQUEST_BYTES:-268435456}
       - INFERENCE_TIMEOUT_SECONDS=${SYNC_INFERENCE_TIMEOUT_SECONDS:-30}
-      # Diarization needs per-word start/end, which come from forced alignment.
-      - SYNC_BFA_ALIGNMENT_ENABLED=${SYNC_BFA_ALIGNMENT_ENABLED:-true}
       # Required on newer GPUs (e.g. Blackwell); see ../../sync/docker/.
       - VLLM_USE_FLASHINFER_SAMPLER=0
     healthcheck:
-      test: ["CMD", "/opt/python/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/readyz', timeout=2)"]
+      test: ["CMD", "/opt/python/bin/python3", "-c", "import urllib.request as u; u.build_opener(u.ProxyHandler({})).open('http://localhost:8080/readyz', timeout=2)"]
       interval: 10s
       timeout: 2s
       retries: 3
-      start_period: 300s
+      start_period: 1800s
     depends_on:
       - license-and-usage-proxy
     networks:

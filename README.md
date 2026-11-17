@@ -152,13 +152,23 @@ until the first successful validation).
 
 ### v1.2.0
 
-#### Sync health check (2026-11-06)
+#### Sync v1.4.0 (2026-11-17)
 
-- The `sync-api` health check now calls the image's bundled Python instead of
-  `curl`, in `sync/docker/` and `examples/sync-diarization/`. Upcoming sync
-  images no longer ship `curl`. Current images work with either check. If you
-  run sync under your own orchestrator, use an HTTP probe on `/readyz` or the
-  same Python command.
+- Bump `self-hosted-sync-asr-universal-3-6-pro` to `release-v1.4.0`, in
+  `sync/docker/` and `examples/sync-diarization/`. It includes the
+  `release-v1.3.0` changes, which were not announced here.
+- **Faster responses.** Typical request latency is about 3x lower than
+  `release-v1.2.0`, with the same accuracy.
+- **Word timestamps on by default.** `"timestamps": true` returns per-word
+  `start`/`end` with no added latency. `SYNC_BFA_ALIGNMENT_ENABLED` is no
+  longer used; remove it from your `.env`.
+- **Longer cold start.** The container takes 15 to 25 minutes to become ready
+  and uses about 25 GB of GPU memory, so it needs a GPU with more than 24 GB.
+  The health check's `start_period` is now 1800 s.
+- **Smaller image.** The image is built on a minimal base and no longer ships
+  `curl`, so the `sync-api` health check now calls the image's bundled Python.
+  If you run sync under your own orchestrator, use an HTTP probe on `/readyz`
+  or the same Python command.
 
 #### Diarization v0.2.1 (2026-11-02)
 
@@ -308,8 +318,8 @@ carried forward.
   FLAC in addition to WAV and raw PCM.
 - **Streamed uploads** — `POST /v1/transcribe/live` transcribes while the audio
   is still uploading (WAV/PCM only).
-- **Word timestamps** — Set `"timestamps": true` for per-word `start`/`end`;
-  requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on the container.
+- **Word timestamps** — Set `"timestamps": true` for per-word `start`/`end`.
+  From `release-v1.3.0` no container setting is needed.
 - **13 more languages** — The same list as streaming above.
 - **Higher config limits** — Longer `prompt`, `keyterms_prompt` and
   `conversation_context` are accepted.

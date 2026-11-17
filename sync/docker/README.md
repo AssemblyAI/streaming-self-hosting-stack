@@ -43,8 +43,8 @@ docker compose -f docker-compose.universal-3-6-pro.yml logs -f
 docker compose -f docker-compose.universal-3-6-pro.yml down
 ```
 
-The `sync-api` container is ready once the model is warm (cold start can take a
-few minutes while weights load and the engine warms up). It exposes
+The `sync-api` container is ready once the model is warm. A cold start takes 15
+to 25 minutes while weights load and the engine compiles and warms up. It exposes
 `GET /readyz` (returns `200` once warm, `503` during cold start), which the
 container uses as its Docker healthcheck — point your load balancer's readiness
 probe at it so requests are only routed once the model is warm.
@@ -98,12 +98,9 @@ health and readiness probes.
 Set `"timestamps": true` in the `config` part to get per-word `start`/`end`
 values in milliseconds alongside each word's `text` and `confidence`.
 
-This requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on the `sync-api` container
-(set it in `.env`). The alignment checkpoint ships inside the image, so no
-extra download is needed, but alignment is off by default because it costs
-extra GPU time on every request that asks for it. With the flag off, a
-`"timestamps": true` request still succeeds — the words simply come back
-without `start`/`end`, so turn the flag on before relying on the field.
+Timestamps are on in every image from `release-v1.3.0`, with no extra setting
+and no added latency. `SYNC_BFA_ALIGNMENT_ENABLED` is no longer used, so remove
+it from your `.env`.
 
 ```bash
 curl -F 'audio=@example/example_audio_file.wav;type=audio/wav' \

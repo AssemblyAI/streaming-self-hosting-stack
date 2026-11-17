@@ -10,9 +10,8 @@ license-and-usage-proxy and one `license.jwt`. Run all commands from this
 > [top-level README](../../README.md).
 
 The stack runs three containers: `sync-api` (GPU), `diarization-api` (GPU) and
-`license-and-usage-proxy`. Sync word timestamps are on
-(`SYNC_BFA_ALIGNMENT_ENABLED=true`), so the sync response posts to
-`/v1/diarize` as is.
+`license-and-usage-proxy`. Sync returns word timestamps when the request
+sets `"timestamps": true`, so the sync response posts to `/v1/diarize` as is.
 
 ## Setup
 
