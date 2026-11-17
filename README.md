@@ -165,10 +165,10 @@ until the first successful validation).
 - **Longer cold start.** The container takes 15 to 25 minutes to become ready
   and uses about 25 GB of GPU memory, so it needs a GPU with more than 24 GB.
   The health check's `start_period` is now 1800 s.
-- **Smaller image.** The image is built on a minimal base and no longer ships
-  `curl`, so the `sync-api` health check now calls the image's bundled Python.
-  If you run sync under your own orchestrator, use an HTTP probe on `/readyz`
-  or the same Python command.
+- **Smaller image.** The image is built on a minimal base, and the `sync-api`
+  health check now calls the image's bundled Python. If you run sync under
+  your own orchestrator, use an HTTP probe on `/readyz` or the same Python
+  command.
 
 #### Diarization v0.2.1 (2026-11-02)
 
