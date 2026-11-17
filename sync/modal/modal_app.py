@@ -220,7 +220,7 @@ class SyncApi:
                 # (or any Server env). User value wins; the compose defaults are
                 # only the fallback. Raising MAX_AUDIO_DURATION_MS usually means
                 # raising MAX_REQUEST_BYTES and INFERENCE_TIMEOUT_SECONDS too.
-                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "1200000"),
+                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "7200000"),
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
                 "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "268435456"),
                 "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),

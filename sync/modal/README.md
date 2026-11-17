@@ -106,7 +106,7 @@ URL is unguessable but public, so treat it as such.
 
 The audio limits (`MAX_AUDIO_DURATION_MS`, `MIN_AUDIO_DURATION_MS`,
 `MAX_REQUEST_BYTES`, `INFERENCE_TIMEOUT_SECONDS`) are read from the environment
-with the compose defaults as fallback (20 min / 256 MB / 30 s), so you can override them by adding the
+with the compose defaults as fallback (2 h / 256 MB / 30 s), so you can override them by adding the
 variable to the `aai-license` secret (or any Server env) — your value wins.
 
 `PROXY_MIN_CONTAINERS` (default `1`) sets how many `LicenseProxy` containers stay

@@ -17,7 +17,7 @@ and, within each service, by **model**.
   stack serves multiple models; the client selects the model per session. See
   [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
-  ≤ 20 min by default). It is self-contained — a single GPU container plus the
+  ≤ 2 h by default). It is self-contained — a single GPU container plus the
   license-and-usage-proxy, no load balancer. See [`sync/docker/README.md`](sync/docker/README.md).
 - **Diarization** adds speaker labels to a transcript (e.g. the sync response).
   See [`diarization/docker/README.md`](diarization/docker/README.md).
@@ -162,6 +162,9 @@ until the first successful validation).
 - **Word timestamps on by default.** `"timestamps": true` returns per-word
   `start`/`end` with no added latency. `SYNC_BFA_ALIGNMENT_ENABLED` is no
   longer used; remove it from your `.env`.
+- **2-hour audio by default.** `MAX_AUDIO_DURATION_MS` now defaults to 2 hours
+  (`7200000`, up from 20 minutes). The 256 MB `MAX_REQUEST_BYTES` default fits
+  2 hours of 16 kHz mono WAV or compressed audio; raise it for higher-rate WAV.
 - **Longer cold start.** The container takes 15 to 25 minutes to become ready
   and uses about 25 GB of GPU memory, so it needs a GPU with more than 24 GB.
   The health check's `start_period` is now 1800 s.

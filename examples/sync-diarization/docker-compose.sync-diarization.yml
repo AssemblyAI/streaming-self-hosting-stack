@@ -29,7 +29,7 @@ services:
       - LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
       # Sync audio limits. The SYNC_ prefix keeps them apart from the
       # diarization limits below (see README.md).
-      - MAX_AUDIO_DURATION_MS=${SYNC_MAX_AUDIO_DURATION_MS:-1200000}
+      - MAX_AUDIO_DURATION_MS=${SYNC_MAX_AUDIO_DURATION_MS:-7200000}
       - MIN_AUDIO_DURATION_MS=${SYNC_MIN_AUDIO_DURATION_MS:-80}
       - MAX_REQUEST_BYTES=${SYNC_MAX_REQUEST_BYTES:-268435456}
       - INFERENCE_TIMEOUT_SECONDS=${SYNC_INFERENCE_TIMEOUT_SECONDS:-30}

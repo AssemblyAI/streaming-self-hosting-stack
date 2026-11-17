@@ -69,7 +69,7 @@ canonical path for new integrations.
 Accepted audio formats: **16-bit PCM WAV** (`audio/wav`), **raw S16LE PCM**
 (`audio/pcm`, with `sample_rate` and `channels` in the config part), and the
 compressed formats **AAC, MP3, M4A, OGG, WebM, and FLAC**. Audio constraints:
-80 ms – 20 min and ≤ 256 MB by default (both configurable — see
+80 ms – 2 h and ≤ 256 MB by default (both configurable — see
 [Audio limits](#audio-limits)), 16-bit, mono or stereo, sample rate one of
 `{8000, 16000, 22050, 24000, 32000, 44100, 48000}`.
 
@@ -117,7 +117,7 @@ set them in `.env` (defaults shown):
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `MAX_AUDIO_DURATION_MS` | `1200000` | Longest accepted audio (20 min); longer requests return `413`. |
+| `MAX_AUDIO_DURATION_MS` | `7200000` | Longest accepted audio (2 h); longer requests return `413`. |
 | `MIN_AUDIO_DURATION_MS` | `80` | Shortest accepted audio; shorter requests return `400`. |
 | `MAX_REQUEST_BYTES` | `268435456` | Request-body cap (256 MB); larger requests return `413`. |
 | `INFERENCE_TIMEOUT_SECONDS` | `30` | Per-request inference deadline; requests that exceed it return `504`. |
