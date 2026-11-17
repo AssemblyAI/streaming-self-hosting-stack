@@ -155,8 +155,7 @@ until the first successful validation).
 #### Sync v1.4.0 (2026-11-17)
 
 - Bump `self-hosted-sync-asr-universal-3-6-pro` to `release-v1.4.0`, in
-  `sync/docker/` and `examples/sync-diarization/`. It includes the
-  `release-v1.3.0` changes, which were not announced here.
+  `sync/docker/` and `examples/sync-diarization/`.
 - **Faster responses.** Typical request latency is about 3x lower than
   `release-v1.2.0`, with the same accuracy.
 - **Word timestamps on by default.** `"timestamps": true` returns per-word
