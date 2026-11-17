@@ -9,8 +9,8 @@ Usage:
 
 Defaults to the sync stack's example_audio_file.wav when no path is given.
 
-Both stacks must be running: sync on port 8080 with SYNC_BFA_ALIGNMENT_ENABLED=true
-(see ../../sync/docker/), diarization on port 8090. The self-hosted services do not
+Both stacks must be running: sync on port 8080 (see ../../sync/docker/),
+diarization on port 8090. The self-hosted services do not
 validate credentials, but every request must carry a non-empty Authorization header.
 """
 

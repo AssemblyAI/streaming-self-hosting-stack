@@ -58,7 +58,7 @@ Both streaming stacks share these same two secrets.
 modal deploy modal_app.py
 ```
 
-The first deploy pulls and converts the ~13.5 GB sync image (several minutes);
+The first deploy pulls and converts the ~16 GB sync image (several minutes);
 later deploys reuse the cached image and take seconds. Two endpoint URLs are
 printed: `https://<workspace>--aai-sync-u3pro-syncapi.<region>.modal.direct` for
 the API and `https://<workspace>--aai-sync-u3pro-licenseproxy-start-server.modal.run`
@@ -106,7 +106,7 @@ URL is unguessable but public, so treat it as such.
 
 The audio limits (`MAX_AUDIO_DURATION_MS`, `MIN_AUDIO_DURATION_MS`,
 `MAX_REQUEST_BYTES`, `INFERENCE_TIMEOUT_SECONDS`) are read from the environment
-with the compose defaults as fallback (20 min / 256 MB / 30 s), so you can override them by adding the
+with the compose defaults as fallback (1 h / 256 MB / 300 s), so you can override them by adding the
 variable to the `aai-license` secret (or any Server env) — your value wins.
 
 `PROXY_MIN_CONTAINERS` (default `1`) sets how many `LicenseProxy` containers stay

@@ -17,7 +17,7 @@ and, within each service, by **model**.
   stack serves multiple models; the client selects the model per session. See
   [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
-  ≤ 20 min by default). It is self-contained — a single GPU container plus the
+  ≤ 1 h by default). It is self-contained — a single GPU container plus the
   license-and-usage-proxy, no load balancer. See [`sync/docker/README.md`](sync/docker/README.md).
 - **Diarization** adds speaker labels to a transcript (e.g. the sync response).
   See [`diarization/docker/README.md`](diarization/docker/README.md).
@@ -151,6 +151,40 @@ until the first successful validation).
 ## Changelog
 
 ### v1.2.0
+
+#### Sync v1.4.0 (2026-11-17)
+
+- Bump `self-hosted-sync-asr-universal-3-6-pro` to `release-v1.4.0`, in
+  `sync/docker/`, `examples/sync-diarization/` and the Modal app (`SYNC_TAG`).
+- **Faster responses.** Typical request latency is about 3x lower than
+  `release-v1.2.0`, with the same accuracy.
+- **Word timestamps need no container setting.** Set `"timestamps": true` per
+  request (the default is `false`). Timing words adds a small latency cost under
+  load.
+- **1-hour audio by default.** The compose files and the Modal app now set
+  `MAX_AUDIO_DURATION_MS` to 1 hour (`3600000`, up from 20 minutes) and
+  `INFERENCE_TIMEOUT_SECONDS` to 300 s (up from 30 s). The deadline includes the
+  upload. The image's own defaults are still 20 minutes and 30 s, so set both if
+  you run it under your own orchestrator. The 256 MB `MAX_REQUEST_BYTES` default
+  fits 1 hour of 16 kHz WAV, mono or stereo; raise it for higher sample rates.
+- **Configuration from the environment is limited.** The image reads only the
+  service settings in the compose file (`HTTP_PORT`, `LOGGING_LEVEL`,
+  `USE_STRUCTURED_LOGGING`, `GPU_MONITORING_ENABLED`,
+  `LICENSE_AND_USAGE_PROXY_ENDPOINT`, `AAI_ENV`) and the four audio limits above.
+  Other model settings, including `VLLM_ATTENTION_BACKEND`, are no longer read.
+  With `AAI_ENV=production`, as in the compose file, they are ignored and logged
+  as an error; without it, the container refuses to start.
+- **Capacity is per container.** A container serves up to 16 requests at once;
+  further requests wait up to 10 s and then return `503`. Scale by adding
+  containers.
+- **Longer start.** Every start takes about 10 to 25 minutes, depending on the
+  GPU and the CPU count, so give the container at least 8 CPUs. It uses about
+  25 GB of GPU memory, so it needs a GPU with more than 24 GB. The health
+  check's `start_period` is now 1800 s and the Modal startup timeout 3600 s.
+- **Minimal base image.** The image no longer includes ffmpeg, sox or espeak-ng,
+  and the `sync-api` health check now calls the image's bundled Python. If you
+  run sync under your own orchestrator, use an HTTP probe on `/readyz` or the
+  same Python command.
 
 #### Diarization v0.2.1 (2026-11-02)
 
@@ -300,8 +334,8 @@ carried forward.
   FLAC in addition to WAV and raw PCM.
 - **Streamed uploads** — `POST /v1/transcribe/live` transcribes while the audio
   is still uploading (WAV/PCM only).
-- **Word timestamps** — Set `"timestamps": true` for per-word `start`/`end`;
-  requires `SYNC_BFA_ALIGNMENT_ENABLED=true` on the container.
+- **Word timestamps** — Set `"timestamps": true` for per-word `start`/`end`.
+  From `release-v1.3.0` no container setting is needed.
 - **13 more languages** — The same list as streaming above.
 - **Higher config limits** — Longer `prompt`, `keyterms_prompt` and
   `conversation_context` are accepted.

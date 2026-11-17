@@ -27,7 +27,7 @@ import modal
 
 APP_NAME = "aai-sync-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-SYNC_TAG = "release-v1.2.0"
+SYNC_TAG = "release-v1.4.0"
 PROXY_TAG = "release-v1.2.0"
 
 # The API's public endpoint requires a Modal proxy-auth token by default, so a
@@ -181,17 +181,17 @@ class LicenseProxy:
 @app.server(
     image=sync_image,
     gpu="L40S",
-    cpu=4,
+    cpu=8,  # the boot-time compile runs one worker per CPU, up to 8
     memory=16384,
     port=SYNC_PORT,
     unauthenticated=not REQUIRE_MODAL_AUTH,
     # Scale-out signal: concurrent in-flight /transcribe requests (GPU-bound).
     # Start conservative and tune against bench/harness.py on your hardware.
     target_concurrency=8,
-    min_containers=1,  # ~2-4 min cold start; keep one warm (503 while cold)
+    min_containers=1,  # ~10-25 min cold start; keep one warm (503 while cold)
     max_containers=4,
     scaledown_window=300,
-    startup_timeout=900,  # weights load + CUDA-graph capture
+    startup_timeout=3600,  # weights load, compile + CUDA-graph capture
     exit_grace_period=60,  # requests are short (INFERENCE_TIMEOUT_SECONDS below)
     secrets=[license_secret],
 )
@@ -220,19 +220,13 @@ class SyncApi:
                 # (or any Server env). User value wins; the compose defaults are
                 # only the fallback. Raising MAX_AUDIO_DURATION_MS usually means
                 # raising MAX_REQUEST_BYTES and INFERENCE_TIMEOUT_SECONDS too.
-                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "1200000"),
+                "MAX_AUDIO_DURATION_MS": os.environ.get("MAX_AUDIO_DURATION_MS", "3600000"),
                 "MIN_AUDIO_DURATION_MS": os.environ.get("MIN_AUDIO_DURATION_MS", "80"),
                 "MAX_REQUEST_BYTES": os.environ.get("MAX_REQUEST_BYTES", "268435456"),
-                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "30"),
-                # Loads the forced aligner that backs `timestamps: true`. Off by
-                # default because alignment costs extra GPU time per request.
-                "SYNC_BFA_ALIGNMENT_ENABLED": os.environ.get(
-                    "SYNC_BFA_ALIGNMENT_ENABLED", "false"
-                ),
-                "VLLM_USE_FLASHINFER_SAMPLER": "0",
+                "INFERENCE_TIMEOUT_SECONDS": os.environ.get("INFERENCE_TIMEOUT_SECONDS", "300"),
             },
         )
-        _wait_http_ok(f"http://localhost:{SYNC_PORT}/readyz", 840)
+        _wait_http_ok(f"http://localhost:{SYNC_PORT}/readyz", 3540)
 
     @modal.exit()
     def stop(self) -> None:
