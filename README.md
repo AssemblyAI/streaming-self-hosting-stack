@@ -159,8 +159,7 @@ until the first successful validation).
 - **Faster responses.** Typical request latency is about 3x lower than
   `release-v1.2.0`, with the same accuracy.
 - **Word timestamps on by default.** `"timestamps": true` returns per-word
-  `start`/`end` with no added latency. `SYNC_BFA_ALIGNMENT_ENABLED` is no
-  longer used; remove it from your `.env`.
+  `start`/`end` with no added latency.
 - **2-hour audio by default.** `MAX_AUDIO_DURATION_MS` now defaults to 2 hours
   (`7200000`, up from 20 minutes). The 256 MB `MAX_REQUEST_BYTES` default fits
   2 hours of 16 kHz mono WAV or compressed audio; raise it for higher-rate WAV.
