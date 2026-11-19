@@ -9,7 +9,8 @@ with no dependency on any other deployment. Compose equivalents live in
 |---|---|---|
 | `assemblyai-stt-3-7-realtime-agent` | `modal_app_stt_3_7_realtime_agent.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
 
-This Modal App has not been tested yet with the v1.5.0 images.
+This Modal App has not been tested yet with the v1.5.0 images. The RTX PRO 4500
+is not supported for streaming in this release.
 
 `StreamingApi` resolves its backend and proxy URLs from the same App at startup,
 so there is no manual wiring or two-phase deploy. The stack serves one model
@@ -30,9 +31,9 @@ modal deploy modal_app_stt_3_7_realtime_agent.py
 ```
 
 The GPU backend keeps one L40S warm (`min_containers=1`) and gates readiness on
-`grpc_health_probe`. The model warms up on every start, which took about 14
-minutes on an RTX PRO 6000 in Docker and will take longer on an L40S, so the
-startup timeout is 3600 s. Modal then autoscales on concurrent sessions
+`grpc_health_probe`. The model warms up on every start, which took about 12 to
+14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S with 4 vCPU in
+Docker, so the startup timeout is 3600 s. Modal then autoscales on concurrent sessions
 (`target_concurrency`). The endpoint URLs are printed, of the form
 `https://<workspace>--<app>-streamingapi.<region>.modal.direct`.
 
