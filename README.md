@@ -44,9 +44,9 @@ on one GPU machine and the load sent from a separate machine.
 | NVIDIA L40S | 48 GB | AWS g6e.xlarge, 4 vCPU | about 22 min | about 12 min | 25 | about 4.0 one-minute requests per second (239 s of audio per second) |
 | NVIDIA RTX PRO 4500 Blackwell | 32 GB | AWS g7.2xlarge, 8 vCPU | not supported | about 12 min | not supported | about 3.8 one-minute requests per second (225 s of audio per second) |
 
-![Streaming median final latency by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
+![Streaming median final latency of assemblyai-stt-3-7-realtime-agent by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
 
-![Sync median time to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500. At the highest measured rate it takes about 1.9 s at 5.1 requests per second on the RTX PRO 6000, 3.1 s at 4.0 on the L40S and 3.4 s at 3.8 on the RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500. At the highest measured rate it takes about 1.9 s at 5.1 requests per second on the RTX PRO 6000, 3.1 s at 4.0 on the L40S and 3.4 s at 3.8 on the RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
 
 In the streaming test every stream sends continuous dense conversational speech
 in real time, streams are added in steps held for 90 seconds each, and latency is
@@ -58,8 +58,7 @@ kept in flight, with 3 rounds at each step. At about 5.1 requests per second the
 RTX PRO 6000 transcribes 303 seconds of audio per second, about 300 times real
 time. The L40S start times were measured on a 4 vCPU instance, half of what the
 stacks ask for, and have not been measured with 8 vCPU. The RTX PRO 4500 is supported for sync but not for streaming in
-this release. The plotted numbers and the script that draws the charts are in
-[`docs/performance/`](docs/performance/).
+this release.
 
 ## Repository layout
 
@@ -68,7 +67,7 @@ this release. The plotted numbers and the script that draws the charts are in
 ├── diarization/
 │   └── docker/  # compose stack (speaker diarization)
 ├── docs/
-│   └── performance/  # Performance by GPU data and chart script
+│   └── performance/  # Performance by GPU charts
 ├── examples/
 │   └── sync-diarization/  # sync + diarization with one proxy
 ├── streaming/
