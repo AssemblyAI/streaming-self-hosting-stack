@@ -44,8 +44,9 @@ docker compose -f docker-compose.universal-3-6-pro.yml down
 ```
 
 The `sync-api` container is ready once the model is warm. Every start takes about
-10 to 25 minutes, depending on the GPU and the CPU count, while weights load and
-the engine compiles and warms up. Give the container at least 8 CPUs. It exposes
+8 minutes on an RTX PRO 6000, and longer on an L40S or with fewer CPUs, while
+weights load and the engine compiles and warms up. Give the container at least
+8 CPUs. It exposes
 `GET /readyz` (returns `200` once warm, `503` during cold start), which the
 container uses as its Docker healthcheck — point your load balancer's readiness
 probe at it so requests are only routed once the model is warm.

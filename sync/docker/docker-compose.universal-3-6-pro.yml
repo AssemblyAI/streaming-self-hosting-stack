@@ -38,7 +38,7 @@ services:
       - MAX_REQUEST_BYTES=${MAX_REQUEST_BYTES:-268435456}
       - INFERENCE_TIMEOUT_SECONDS=${INFERENCE_TIMEOUT_SECONDS:-300}
     healthcheck:
-      # Ready once the model is warm (about 10 to 25 minutes on every start).
+      # Ready once the model is warm (about 8 minutes on an RTX PRO 6000, on every start).
       test: ["CMD", "/opt/python/bin/python3", "-c", "import urllib.request as u; u.build_opener(u.ProxyHandler({})).open('http://localhost:8080/readyz', timeout=2)"]
       interval: 10s
       timeout: 2s

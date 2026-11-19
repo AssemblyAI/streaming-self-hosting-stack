@@ -8,13 +8,12 @@ and, within each service, by **model**.
 
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000 (tested); L40S not yet measured |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Diarization** | [`diarization/`](diarization/) | Synchronous HTTP, full-file | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
 
-- **Streaming** transcribes a live audio stream over a WebSocket connection. One
-  stack serves multiple models; the client selects the model per session. See
+- **Streaming** transcribes a live audio stream over a WebSocket connection. The
+  stack serves the `assemblyai-stt-3-7-realtime-agent` model. See
   [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
   ≤ 1 h by default). It is self-contained — a single GPU container plus the
@@ -43,8 +42,8 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 ├── examples/
 │   └── sync-diarization/  # sync + diarization with one proxy
 ├── streaming/
-│   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
-│   └── modal/   # serverless-GPU packages
+│   ├── docker/  # compose stack (assemblyai-stt-3-7-realtime-agent)
+│   └── modal/   # serverless-GPU package
 └── sync/
     ├── docker/  # compose stack (Universal-3.6 Pro)
     └── modal/   # serverless-GPU package
@@ -149,6 +148,41 @@ until the first successful validation).
 - **Availability**: run a few containers behind a load balancer.
 
 ## Changelog
+
+### v1.5.0
+
+#### Streaming serves assemblyai-stt-3-7-realtime-agent (2026-11-19)
+
+- **One model.** The streaming stack now serves only
+  `assemblyai-stt-3-7-realtime-agent`, from the new
+  `self-hosted-streaming-asr-stt-3-7-agent:release-v1.5.0` image, with
+  `self-hosted-streaming-api:release-v1.5.0`. Clients connect with
+  `speech_model=assemblyai-stt-3-7-realtime-agent`, which is also the default
+  when `speech_model` is omitted.
+- **Older streaming models discontinued.** The Universal English, Universal
+  Multilingual and Universal-3.6 Pro streaming images are no longer released.
+  `docker-compose.english-multilang.yml`, `docker-compose.universal-3-6-pro.yml`
+  and their Modal apps are removed. Bring the old stack `down`, then bring up
+  `streaming/docker/docker-compose.stt-3-7-realtime-agent.yml` with the image
+  variables from `streaming/docker/.env.example`.
+- **Longer start.** The model warms up on every start, which took about 13 to
+  14 minutes on an RTX PRO 6000 with up to about 72 GB of GPU memory in use.
+  Other GPUs, including the L40S, have not been measured yet. The health check's
+  `start_period` is 3600 s.
+- **Modal.** `streaming/modal/modal_app_stt_3_7_realtime_agent.py` replaces the
+  previous streaming Modal apps. It has not been tested yet.
+- **`streaming-api` health check.** The new `self-hosted-streaming-api` image
+  does not include curl, so the compose health check now calls the image's
+  bundled Python. If you run it under your own orchestrator, use an HTTP probe on
+  `/v3/ws/health` or the same Python command.
+- The license-and-usage-proxy is unchanged; keep your current proxy image.
+
+#### Sync v1.5.0 (2026-11-19)
+
+- Bump `self-hosted-sync-asr-universal-3-6-pro` to `release-v1.5.0`, in
+  `sync/docker/`, `examples/sync-diarization/` and the Modal app (`SYNC_TAG`).
+- **Faster start.** A cold start takes about 8 minutes on an RTX PRO 6000,
+  down from about 14 minutes with `release-v1.4.0`, with equivalent transcripts.
 
 ### v1.2.0
 

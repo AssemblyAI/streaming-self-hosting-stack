@@ -7,32 +7,21 @@ Real-time transcription over a WebSocket connection. Run all commands from this
 > license-and-usage-proxy (usage reporting, license status endpoint, proxy
 > production recommendations) are documented in the [top-level README](../../README.md).
 
-## Choosing a stack
+## The stack
 
-Two stacks are shipped. Pick the one that matches the model you want to serve —
-they are mutually exclusive (run one at a time):
-
-| File | Models served | GPU requirement |
-|------|--------------|-----------------|
-| `docker-compose.english-multilang.yml` | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| `docker-compose.universal-3-6-pro.yml` | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 |
-
-To switch between stacks, run `docker compose -f <file> down` before starting the other.
+One stack is shipped. `docker-compose.stt-3-7-realtime-agent.yml` serves the
+`assemblyai-stt-3-7-realtime-agent` model on one GPU. It has been tested on an
+NVIDIA RTX PRO 6000; other GPUs, including the L40S, have not been measured yet.
 
 ## Services included
 
-Every stack includes:
 - **streaming-api**: Gateway API service handling WebSocket connections.
 - **streaming-asr-lb**: nginx load balancer for ASR services with header-based routing.
+- **streaming-asr-stt-3-7-agent**: the ASR backend for `assemblyai-stt-3-7-realtime-agent`.
 - **license-and-usage-proxy**: License validation and usage reporting (see [top-level README](../../README.md#shared-component-license-and-usage-proxy)).
-
-ASR backends differ by stack:
-- Universal stack (`docker-compose.english-multilang.yml`): `streaming-asr-english` and `streaming-asr-multilang`.
-- Universal-3.6 Pro stack (`docker-compose.universal-3-6-pro.yml`): `streaming-asr-universal-3-6-pro`.
 
 ## Connection flow
 
-**Universal stack** (`docker-compose.english-multilang.yml`):
 ```
 Websocket client → streaming-api:8080 (WebSocket)
                           │
@@ -41,49 +30,24 @@ Websocket client → streaming-api:8080 (WebSocket)
                           ├─ License validation  ─────────┘
                           │
                           └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                                ├── en-default → streaming-asr-english:50051 (gRPC)
-                                                                                └── ml-default → streaming-asr-multilang:50051 (gRPC)
+                                                                                └── default → streaming-asr-stt-3-7-agent:50051 (gRPC)
 ```
-
-**Universal-3.6 Pro stack** (`docker-compose.universal-3-6-pro.yml`):
-```
-Websocket client → streaming-api:8080 (WebSocket)
-                          │
-                          ├─ Usage reporting     ───────→ license-and-usage-proxy:8080 [if usage-based billing] ────→ https://usage-tracker.assemblyai.com
-                          │                               │
-                          ├─ License validation  ─────────┘
-                          │
-                          └─ ASR requests        ───────→ streaming-asr-lb:80 → Header-based routing (X-Model-Version):
-                                                                                └── universal-3-6-pro → streaming-asr-universal-3-6-pro:50051 (gRPC)
-```
-
-Both stacks share the same `nginx_streaming_asr.conf`, which routes by
-`X-Model-Version` header. Each stack only deploys the backends it needs —
-websocket clients should use a `speech_model` query parameter value that routes
-to an available backend.
 
 ## Setup
 
 Complete the [shared prerequisites](../../README.md#prerequisites-all-services)
 (GPU runtime, ECR authentication, license file) first.
 
-Copy the env reference and set the image variables for the stack you plan to run:
+Copy the env reference and set the image variables:
 
 ```bash
 cp .env.example .env
 ```
 
 ```bash
-# Required for every stack:
 STREAMING_API_IMAGE=<CUSTOM_IMAGE>
 LICENSE_AND_USAGE_PROXY_IMAGE=<CUSTOM_IMAGE>
-
-# Required for the Universal stack (docker-compose.english-multilang.yml):
-STREAMING_ASR_ENGLISH_IMAGE=<CUSTOM_IMAGE>
-STREAMING_ASR_MULTILANG_IMAGE=<CUSTOM_IMAGE>
-
-# Required for the Universal-3.6 Pro stack (docker-compose.universal-3-6-pro.yml):
-STREAMING_ASR_UNIVERSAL_3_6_PRO_IMAGE=<CUSTOM_IMAGE>
+STREAMING_ASR_STT_3_7_AGENT_IMAGE=<CUSTOM_IMAGE>
 ```
 
 Place your `license.jwt` in this directory (or repoint `LICENSE_FILE_PATH` in the compose file).
@@ -91,34 +55,19 @@ If your license uses usage-based billing, also set `USAGE_TRACKING_API_KEY` in `
 
 ## Run
 
-Both stacks use the same `streaming-api`, load balancer, and license proxy —
-they differ only in the ASR backend. Websocket clients select the model with the
-`speech_model` query parameter, so the load balancer routes to that model's
-backend: `universal-streaming-english` or `universal-streaming-multilingual` for
-the Universal stack, `universal-3-6-pro` for the Universal-3.6 Pro stack.
+Websocket clients select the model with the `speech_model` query parameter set
+to `assemblyai-stt-3-7-realtime-agent`. It is also the default when the
+parameter is omitted.
 
-**Universal stack** (English + Multilingual):
 ```bash
-docker compose -f docker-compose.english-multilang.yml up -d
-docker compose -f docker-compose.english-multilang.yml logs -f
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml up -d
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml logs -f
 
 # Check service status
-docker compose -f docker-compose.english-multilang.yml ps
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml ps
 
-# Stop services before switching stacks
-docker compose -f docker-compose.english-multilang.yml down
-```
-
-**Universal-3.6 Pro stack**:
-```bash
-docker compose -f docker-compose.universal-3-6-pro.yml up -d
-docker compose -f docker-compose.universal-3-6-pro.yml logs -f
-
-# Check service status
-docker compose -f docker-compose.universal-3-6-pro.yml ps
-
-# Stop services before switching stacks
-docker compose -f docker-compose.universal-3-6-pro.yml down
+# Stop services
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml down
 ```
 
 ## Service endpoints
@@ -129,10 +78,9 @@ docker compose -f docker-compose.universal-3-6-pro.yml down
 
 A Python example script is provided to demonstrate how to stream audio to the stack.
 
-_Note_: You can initiate a session as soon as the relevant ASR container is
-healthy. `streaming-asr-english` and `streaming-asr-multilang` log "Ready to
-serve!" when ready (typically ~2 min); `streaming-asr-universal-3-6-pro` logs
-"U3Pro ASR Server ready!" when warm (typically ~5 min).
+_Note_: You can initiate a session as soon as the `streaming-asr-stt-3-7-agent`
+container is healthy. The model warms up on every start, which takes about 13 to
+14 minutes on an RTX PRO 6000 and longer on slower GPUs.
 
 Change into the `example/` directory:
 ```bash
@@ -153,18 +101,9 @@ pip install -r requirements.txt
 The example script (`example_with_prerecorded_audio_file.py`) accepts several CLI arguments:
 
 **Basic usage:**
-- Universal stack English:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-english"
-    ```
-- Universal stack Multilingual:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-streaming-multilingual"
-    ```
-- Universal-3.6 Pro stack:
-    ```bash
-    python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "universal-3-6-pro"
-    ```
+```bash
+python example_with_prerecorded_audio_file.py --audio-file "example_audio_file.wav" --endpoint "ws://localhost:8080" --speech-model "assemblyai-stt-3-7-realtime-agent"
+```
 
 **Command-line arguments:**
 
@@ -172,7 +111,7 @@ The example script (`example_with_prerecorded_audio_file.py`) accepts several CL
 |----------|--------------------------------------------------------|--------------------------|
 | `--audio-file` | Path to the audio file to transcribe                   | `example_audio_file.wav` |
 | `--endpoint` | WebSocket endpoint URL                                 | `ws://localhost:8080`     |
-| `--speech-model` | Speech model to use (e.g., 'universal-streaming-multilingual') | ``               |
+| `--speech-model` | Speech model to use (e.g., 'assemblyai-stt-3-7-realtime-agent') | ``               |
 
 **View help:**
 ```bash
@@ -185,7 +124,7 @@ python example_with_prerecorded_audio_file.py --help
 
 **ASR Load Balancer** (`nginx_streaming_asr.conf`):
 - gRPC proxying to ASR services.
-- Routes to the English, Multilingual, or Universal-3.6 Pro backend based on the `X-Model-Version` header value.
+- Routes every session to the `streaming-asr-stt-3-7-agent` backend.
 
 ### Usage reporting
 
@@ -206,21 +145,18 @@ docker stats
 
 ```bash
 # Check nginx configuration
-docker compose -f docker-compose.english-multilang.yml exec streaming-asr-lb nginx -t
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml exec streaming-asr-lb nginx -t
 
-# Restart specific service (Universal stack)
-docker compose -f docker-compose.english-multilang.yml restart streaming-api
-docker compose -f docker-compose.english-multilang.yml restart streaming-asr-english
-docker compose -f docker-compose.english-multilang.yml restart streaming-asr-multilang
-
-# Restart specific service (Universal-3.6 Pro stack)
-docker compose -f docker-compose.universal-3-6-pro.yml restart streaming-asr-universal-3-6-pro
+# Restart specific service
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml restart streaming-api
+docker compose -f docker-compose.stt-3-7-realtime-agent.yml restart streaming-asr-stt-3-7-agent
 ```
 
 ## Deploying on Modal (serverless GPU)
 
-Both streaming stacks also run on Modal's serverless GPUs as self-contained,
-single-`modal deploy` Modal Apps. See [`../modal/`](../modal/).
+The streaming stack also has a self-contained, single-`modal deploy` Modal App
+for Modal's serverless GPUs. It has not been tested yet with the v1.5.0 images.
+See [`../modal/`](../modal/).
 
 ## Production deployment recommendations
 
@@ -238,18 +174,11 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
 - **Usage Reporting Behavior**: After each session completes, the streaming-api reports usage to the license-and-usage-proxy with automatic retries on failure. Monitor logs for any messages at a >= warning level.
 
-### streaming-asr-english and streaming-asr-multilang services
-
-- **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new streaming-asr container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: The services can run on NVIDIA T4 or newer GPUs. We recommend allocating at least 4 CPU and 16GB of RAM per container.
-- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container with recommended hardware can generally handle up to 28 concurrent sessions.
-- **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
-- **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
-
-### streaming-asr-universal-3-6-pro service
+### streaming-asr-stt-3-7-agent service
 
 - **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new ASR container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000. The model weights use ~11 GB of VRAM; the remaining VRAM becomes vLLM KV cache and sets max concurrency (more VRAM, higher concurrency). Allow ~30 GB of disk for the ~23 GB Docker image plus working space.
-- **Autoscaling**: You can set up autoscaling based on the number of active sessions. A container using L40S GPU can generally handle up to 40 concurrent sessions.
+- **Hardware Requirements**: Tested on an NVIDIA RTX PRO 6000, where it used up to about 72 GB of GPU memory. The L40S and other GPUs have not been measured yet. The Docker image is about 40 GB, so allow enough disk for it plus working space.
+- **Startup**: The model warms up on every start, which takes about 13 to 14 minutes on an RTX PRO 6000 and longer on slower GPUs. The health check allows up to an hour. Start new containers well before you need them, and do not scale this service to zero.
+- **Autoscaling**: You can set up autoscaling based on the number of active sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.
