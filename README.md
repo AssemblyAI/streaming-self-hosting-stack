@@ -59,20 +59,19 @@ supported for streaming in this release.
 
 Model `universal-3-6-pro`.
 
-| GPU | Start time | Recommended requests per minute |
-|-----|------------|---------------------------------|
-| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to 200 |
-| NVIDIA L40S (48 GB) | about 12 min | up to 130 |
-| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to 130 |
+| GPU | Start time | Recommended requests per minute | Real-time factor |
+|-----|------------|---------------------------------|------------------|
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to 200 | 200× |
+| NVIDIA L40S (48 GB) | about 12 min | up to 130 | 130× |
+| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to 130 | 130× |
 
 The recommended value is the highest measured rate where a request carrying one
 minute of audio finished in under one second at the median. Shorter audio allows
-a higher rate and longer audio a lower one. Because each test request is one
-minute of audio, the requests per minute figure is also the real-time factor, so
-200 requests per minute means 200 seconds of audio transcribed per second, and you
-can use that figure to estimate capacity for other audio lengths.
+a higher rate and longer audio a lower one. The real-time factor is the seconds
+of audio transcribed per second at that rate, which you can use to estimate
+capacity for other audio lengths.
 
-![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per minute, for the RTX PRO 6000, L40S and RTX PRO 4500. The top axis shows the same load as a real-time factor.](docs/performance/sync-latency-by-gpu.svg)
+![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per minute, for the RTX PRO 6000, L40S and RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
 
 The L40S start times were measured on a 4 vCPU instance, half of what the stacks
 ask for.
