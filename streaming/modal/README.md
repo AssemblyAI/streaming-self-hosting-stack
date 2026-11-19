@@ -1,21 +1,20 @@
 # Streaming stacks on Modal (serverless GPU)
 
-Each streaming stack runs on [Modal](https://modal.com) as a self-contained
+The streaming stack runs on [Modal](https://modal.com) as a self-contained
 Modal App: one `modal deploy` brings up every service and wires them together,
 with no dependency on any other deployment. Compose equivalents live in
 [`../docker/`](../docker/).
 
 | Stack | File | Servers |
 |---|---|---|
-| Universal-3.6 Pro | `modal_app_universal_3_6_pro.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
-| English + Multilingual | `modal_app_english_multilang.py` | `StreamingApi` (CPU), `Lb` (CPU nginx), `AsrEnglish` (L40S), `AsrMultilang` (L40S), `LicenseProxy` (CPU) |
+| `assemblyai-stt-3-7-realtime-agent` | `modal_app_stt_3_7_realtime_agent.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
+
+This Modal App has not been tested yet with the v1.5.0 images. The RTX PRO 4500
+is not supported for streaming in this release.
 
 `StreamingApi` resolves its backend and proxy URLs from the same App at startup,
-so there is no manual wiring or two-phase deploy. The Universal-3.6 Pro stack
-serves one model and needs no router, so nginx is dropped. The
-English + Multilingual stack serves two models, so it keeps an nginx `Lb` that
-routes the `x-model-version` gRPC metadata (from the client's `speech_model`) to
-the matching backend, exactly as `streaming-asr-lb` does in compose.
+so there is no manual wiring or two-phase deploy. The stack serves one model
+and needs no router, so nginx is dropped.
 
 ## Prerequisites and secrets
 
@@ -28,14 +27,14 @@ stack shares them. If your license uses usage-based billing, include
 ## Deploy
 
 ```bash
-modal deploy modal_app_universal_3_6_pro.py     # or modal_app_english_multilang.py
+modal deploy modal_app_stt_3_7_realtime_agent.py
 ```
 
-Each GPU backend keeps one L40S warm (`min_containers=1`) and gates readiness on
-`grpc_health_probe`, so the first deploy takes a few minutes to warm the model;
-Modal then autoscales on concurrent sessions, with `target_concurrency` set to
-each stack's `MAX_OPEN_STREAMS` (Universal-3.6 Pro 32, English + Multilingual
-48, matching compose). The endpoint URLs are printed, of the form
+The GPU backend keeps one L40S warm (`min_containers=1`) and gates readiness on
+`grpc_health_probe`. The model warms up on every start, which took about 12 to
+14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S with 4 vCPU in
+Docker, so the startup timeout is 3600 s. Modal then autoscales on concurrent sessions
+(`target_concurrency`). The endpoint URLs are printed, of the form
 `https://<workspace>--<app>-streamingapi.<region>.modal.direct`.
 
 ## Verify
@@ -46,22 +45,19 @@ proxy-auth token (`--modal-key` / `--modal-secret`, or `MODAL_KEY` /
 without a token, deploy the endpoint with `AAI_REQUIRE_MODAL_AUTH=0`.
 
 ```bash
-curl -fsS https://<workspace>--aai-streaming-u36pro-licenseproxy.<region>.modal.direct/v1/status
+curl -fsS https://<workspace>--aai-streaming-stt-3-7-agent-licenseproxy.<region>.modal.direct/v1/status
 
 # Stream with the bundled sample client (it forwards Modal proxy-auth headers;
 # the repo's example_with_prerecorded_audio_file.py does not, so it only works
 # against an AAI_REQUIRE_MODAL_AUTH=0 endpoint):
 python sample_streaming.py \
-  --endpoint wss://<workspace>--aai-streaming-u36pro-streamingapi.<region>.modal.direct \
+  --endpoint wss://<workspace>--aai-streaming-stt-3-7-agent-streamingapi.<region>.modal.direct \
   --audio ../docker/example/example_audio_file.wav \
-  --speech-model universal-3-6-pro \
+  --speech-model assemblyai-stt-3-7-realtime-agent \
   --modal-key "$MODAL_KEY" --modal-secret "$MODAL_SECRET"
 ```
 
-For the English + Multilingual stack use `--speech-model universal-streaming-english`
-or `universal-streaming-multilingual`; the API maps these to the `en-default` /
-`ml-default` routing keys and the `Lb` sends each to its backend. Or use the
-[sample script](#sample-requests).
+Or use the [sample script](#sample-requests).
 
 ## Authentication and security
 
@@ -74,7 +70,7 @@ gateway).
 
 This authenticated front door is the real access gate.
 
-The internal hops (`StreamingApi` to `Asr`/`Lb`, and to `LicenseProxy`) cross
+The internal hops (`StreamingApi` to `Asr`, and to `LicenseProxy`) cross
 Modal's TLS edge, **not** a private bridge network as in compose, because Modal
 has no private inter-container network by default, so these `.modal.direct`
 endpoints are public. The gRPC hop is encrypted (`h2_enabled` advertises ALPN h2
@@ -109,9 +105,9 @@ opens N concurrent sessions.
 ```bash
 pip install websockets
 python sample_streaming.py \
-  --endpoint wss://<workspace>--aai-streaming-u36pro-streamingapi.<region>.modal.direct \
+  --endpoint wss://<workspace>--aai-streaming-stt-3-7-agent-streamingapi.<region>.modal.direct \
   --audio ../docker/example/example_audio_file.wav \
-  --speech-model universal-3-6-pro
+  --speech-model assemblyai-stt-3-7-realtime-agent
 ```
 
 If the stack was deployed with the default proxy auth, pass `--modal-key` /
@@ -119,11 +115,11 @@ If the stack was deployed with the default proxy auth, pass `--modal-key` /
 
 ## Cost and teardown
 
-Each GPU backend holds an L40S while up (Modal bills it), scaling to at most
-`max_containers` and down after `scaledown_window`. Tear a stack down when done:
+The GPU backend holds an L40S while up (Modal bills it), scaling to at most
+`max_containers` and down after `scaledown_window`. Tear the stack down when done:
 
 ```bash
-modal app stop aai-streaming-u36pro                # or aai-streaming-english-multilang
+modal app stop aai-streaming-stt-3-7-agent
 ```
 
 Audio is processed on Modal's multi-tenant cloud in the configured region

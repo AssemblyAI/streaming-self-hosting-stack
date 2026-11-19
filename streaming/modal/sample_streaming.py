@@ -2,16 +2,10 @@
 """Stream a sample WAV to a deployed **streaming** stack and print turns live.
 
     pip install websockets
-    # Universal-3.6 Pro stack:
     python sample_streaming.py \
-        --endpoint wss://<workspace>--aai-streaming-u36pro-streamingapi.<region>.modal.direct \
+        --endpoint wss://<workspace>--aai-streaming-stt-3-7-agent-streamingapi.<region>.modal.direct \
         --audio ../docker/example/example_audio_file.wav \
-        --speech-model universal-3-6-pro
-
-    # English + Multilingual stack (pick the model):
-    python sample_streaming.py --endpoint wss://<workspace>--aai-streaming-english-multilang-streamingapi.<region>.modal.direct \
-        --audio ../docker/example/example_audio_file.wav --speech-model universal-streaming-english
-    #   ... or --speech-model universal-streaming-multilingual
+        --speech-model assemblyai-stt-3-7-realtime-agent
 
 Audio is sent at real time by default so you watch partial turns update and
 finalize, exactly as a live microphone would. Use --speed 2 to send twice as
@@ -106,7 +100,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--endpoint", required=True, help="wss://...streamingapi... URL")
     ap.add_argument("--audio", required=True, help="16-bit PCM mono WAV")
-    ap.add_argument("--speech-model", help="universal-3-6-pro | universal-streaming-english | universal-streaming-multilingual")
+    ap.add_argument("--speech-model", help="assemblyai-stt-3-7-realtime-agent")
     ap.add_argument("--speed", type=float, default=1.0, help="send rate vs realtime (2 = twice as fast)")
     ap.add_argument("--load", type=int, default=1, help="open N concurrent sessions")
     ap.add_argument("--open-timeout", type=float, default=300.0, help="WS handshake wait (cold starts are slow)")

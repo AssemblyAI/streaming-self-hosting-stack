@@ -1,3 +1,14 @@
+# Self-hosted streaming stack serving assemblyai-stt-3-7-realtime-agent.
+#
+# Serves the assemblyai-stt-3-7-realtime-agent model
+# (STREAMING_ASR_STT_3_7_AGENT_IMAGE). Websocket clients select it with
+# speech_model "assemblyai-stt-3-7-realtime-agent", which is also the default
+# when speech_model is omitted. The load balancer routes every session to the
+# streaming-asr-stt-3-7-agent backend.
+#
+# Usage:
+#   docker compose -f docker-compose.stt-3-7-realtime-agent.yml up -d
+
 services:
   streaming-api:
     image: ${STREAMING_API_IMAGE}
@@ -11,7 +22,7 @@ services:
       - AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=False
       - AAI_LICENSE_AND_USAGE_PROXY_ENDPOINT=http://license-and-usage-proxy:8080
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v3/ws/health"]
+      test: ["CMD", "/opt/python/bin/python3", "-c", "import urllib.request as u; u.build_opener(u.ProxyHandler({})).open('http://localhost:8080/v3/ws/health', timeout=2)"]
       interval: 10s
       timeout: 2s
       retries: 2
@@ -35,51 +46,26 @@ services:
     volumes:
       - ./nginx_streaming_asr.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - streaming-asr-english
-      - streaming-asr-multilang
+      - streaming-asr-stt-3-7-agent
     networks:
       - streaming-network
 
-  streaming-asr-english:
-    image: ${STREAMING_ASR_ENGLISH_IMAGE}
+  streaming-asr-stt-3-7-agent:
+    image: ${STREAMING_ASR_STT_3_7_AGENT_IMAGE}
     ports:
       - "50051:50051"
     environment:
       - SERVER_PORT=50051
       - LOGGING_LEVEL=INFO
       - USE_STRUCTURED_LOGGING=False
-      - MAX_OPEN_STREAMS=48
+    shm_size: 64m
     healthcheck:
+      # Ready once the model is warm (about 12 to 14 minutes on an RTX PRO 6000, on every start).
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
       timeout: 2s
       retries: 5
-      start_period: 120s
-    networks:
-      - streaming-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ "gpu" ]
-
-  streaming-asr-multilang:
-    image: ${STREAMING_ASR_MULTILANG_IMAGE}
-    ports:
-      - "50052:50051"
-    environment:
-      - SERVER_PORT=50051
-      - LOGGING_LEVEL=INFO
-      - USE_STRUCTURED_LOGGING=False
-      - MAX_OPEN_STREAMS=48
-    healthcheck:
-      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 120s
+      start_period: 3600s
     networks:
       - streaming-network
     deploy:

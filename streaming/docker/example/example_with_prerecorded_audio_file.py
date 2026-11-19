@@ -222,7 +222,7 @@ Examples:
   python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav
 
   # Specify custom endpoint and speech model
-  python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav --endpoint ws://localhost:8080 --speech-model universal-streaming-multilingual
+  python example_with_prerecorded_audio_file.py --audio-file example_audio_file.wav --endpoint ws://localhost:8080 --speech-model assemblyai-stt-3-7-realtime-agent
 
 Note: Audio file must be PCM 16-bit WAV format, mono channel, 16kHz sample rate.
         """,
@@ -243,7 +243,7 @@ Note: Audio file must be PCM 16-bit WAV format, mono channel, 16kHz sample rate.
         "--speech-model",
         type=str,
         default="",
-        help="Speech model to use (e.g., 'universal-streaming-english', 'universal-streaming-multilingual')",
+        help="Speech model to use (e.g., 'assemblyai-stt-3-7-realtime-agent')",
     )
     return parser.parse_args()
 

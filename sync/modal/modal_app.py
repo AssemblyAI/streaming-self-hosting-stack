@@ -8,6 +8,8 @@ any other deployment:
   sync_api       (L40S) -> sync-api, a Modal Server that resolves the proxy's
                            URL at startup
 
+Not yet tested with the v1.5.0 image.
+
 Deploy:  modal deploy modal_app.py
 Tear down: modal app stop aai-sync-u3pro
 
@@ -27,7 +29,7 @@ import modal
 
 APP_NAME = "aai-sync-u3pro"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-SYNC_TAG = "release-v1.4.0"
+SYNC_TAG = "release-v1.5.0"
 PROXY_TAG = "release-v1.2.0"
 
 # The API's public endpoint requires a Modal proxy-auth token by default, so a

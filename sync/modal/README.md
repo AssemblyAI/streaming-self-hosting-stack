@@ -18,6 +18,8 @@ to zero when a deployment allows it (see [Cost and teardown](#cost-and-teardown)
 `SyncApi` resolves `LicenseProxy`'s URL from the same App at startup, so there
 is no manual wiring or two-phase deploy.
 
+This Modal App has not been tested yet with the v1.5.0 image.
+
 ## Prerequisites
 
 ```bash
@@ -50,7 +52,7 @@ modal secret create aai-license \
   USAGE_TRACKING_API_KEY=...
 ```
 
-Both streaming stacks share these same two secrets.
+The streaming stack shares these same two secrets.
 
 ## Deploy
 

@@ -1,11 +1,11 @@
-"""Run the self-hosted streaming Universal-3.6 Pro stack on Modal, standalone.
+"""Run the self-hosted streaming assemblyai-stt-3-7-realtime-agent stack on Modal, standalone.
 
-`modal deploy modal_app_universal_3_6_pro.py` brings up the whole stack in one
+`modal deploy modal_app_stt_3_7_realtime_agent.py` brings up the whole stack in one
 command; nothing depends on any other deployment. Compose's four services become
 three Modal Servers in one App:
 
   streaming_api  (CPU)   -> WebSocket front door, the public entrypoint
-  asr            (L40S)  -> Universal-3.6 Pro gRPC backend
+  asr            (L40S)  -> assemblyai-stt-3-7-realtime-agent gRPC backend
   license_proxy  (CPU)   -> license-and-usage-proxy
 
 nginx (streaming-asr-lb) is dropped: it only routes X-Model-Version across
@@ -17,8 +17,10 @@ The API dials the ASR over Modal's TLS edge (h2_enabled advertises ALPN h2, so a
 standard gRPC client connects) with AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=True,
 replacing compose's private bridge network. See README "Security".
 
-Deploy:  modal deploy modal_app_universal_3_6_pro.py
-Tear down: modal app stop aai-streaming-u36pro
+Not yet tested with the v1.5.0 images.
+
+Deploy:  modal deploy modal_app_stt_3_7_realtime_agent.py
+Tear down: modal app stop aai-streaming-stt-3-7-agent
 """
 
 import os
@@ -28,12 +30,12 @@ import threading
 
 import modal
 
-APP_NAME = "aai-streaming-u36pro"
+APP_NAME = "aai-streaming-stt-3-7-agent"
 REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
-# As of v1.2.0 every image in the streaming stack ships on the same release tag
-# (see the Changelog in the top-level README).
-API_TAG = "release-v1.2.0"
-ASR_TAG = "release-v1.2.0"
+# The license-and-usage-proxy is not re-released with v1.5.0, so it keeps its own
+# tag (see the Changelog in the top-level README).
+API_TAG = "release-v1.5.0"
+ASR_TAG = "release-v1.5.0"
 PROXY_TAG = "release-v1.2.0"
 ASR_GRPC_PORT = 50051
 
@@ -42,7 +44,7 @@ ASR_GRPC_PORT = 50051
 REQUIRE_MODAL_AUTH = os.environ.get("AAI_REQUIRE_MODAL_AUTH", "1") != "0"
 
 API_BIN = "/opt/assemblyai/engineering/projects/realtime/api_v2/bin"
-ASR_BIN = "/opt/assemblyai/engineering/projects/realtime/asr_u3pro/self_hosted_universal_3_6_pro_bin"
+ASR_BIN = "/opt/assemblyai/engineering/projects/realtime/asr_u3pro/self_hosted_stt_3_7_agent_bin"
 PROXY_BIN = "/opt/assemblyai/engineering/projects/realtime/license_and_usage_proxy/bin"
 
 LICENSE_PATH = "/var/aai_license.jwt"
@@ -64,7 +66,7 @@ def _vendor_image(repo: str, tag: str) -> modal.Image:
     )
 
 
-asr_image = _vendor_image("self-hosted-streaming-asr-universal-3-6-pro", ASR_TAG)
+asr_image = _vendor_image("self-hosted-streaming-asr-stt-3-7-agent", ASR_TAG)
 api_image = _vendor_image("self-hosted-streaming-api", API_TAG)
 proxy_image = _vendor_image("self-hosted-streaming-license-and-usage-proxy", PROXY_TAG)
 
@@ -156,19 +158,17 @@ class LicenseProxy:
     # Called server-side by streaming_api over gRPC, which cannot attach Modal
     # auth headers, so the endpoint is unauthenticated. See README "Security".
     unauthenticated=True,
-    target_concurrency=32,  # mirrors MAX_OPEN_STREAMS
-    min_containers=1,  # ~5 min warm-up; never scale a realtime backend to zero
+    target_concurrency=25,
+    min_containers=1,  # about 12 to 14 min warm-up on an RTX PRO 6000, longer on an L40S; never scale a realtime backend to zero
     max_containers=4,
     buffer_containers=1,  # scale-up lead time is the warm-up, so keep a warm spare
     scaledown_window=600,
-    startup_timeout=900,
+    startup_timeout=3600,
     exit_grace_period=600,  # let in-flight streams drain instead of dying
     env={
         "SERVER_PORT": str(ASR_GRPC_PORT),
         "LOGGING_LEVEL": "INFO",
         "USE_STRUCTURED_LOGGING": "False",
-        "MAX_OPEN_STREAMS": os.environ.get("MAX_OPEN_STREAMS", "32"),
-        "VLLM_USE_FLASHINFER_SAMPLER": "0",
     },
 )
 class Asr:
@@ -179,7 +179,7 @@ class Asr:
         # session to a cold engine.
         import time
 
-        deadline = time.monotonic() + 840
+        deadline = time.monotonic() + 3540
         while time.monotonic() < deadline:
             if subprocess.run(
                 ["grpc_health_probe", f"-addr=:{ASR_GRPC_PORT}"],

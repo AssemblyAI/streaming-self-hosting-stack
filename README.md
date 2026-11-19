@@ -8,13 +8,12 @@ and, within each service, by **model**.
 
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal English + Multilingual | NVIDIA T4+ per ASR container |
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000 or L40S (RTX PRO 4500 not supported in this release) |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Diarization** | [`diarization/`](diarization/) | Synchronous HTTP, full-file | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
 
-- **Streaming** transcribes a live audio stream over a WebSocket connection. One
-  stack serves multiple models; the client selects the model per session. See
+- **Streaming** transcribes a live audio stream over a WebSocket connection. The
+  stack serves the `assemblyai-stt-3-7-realtime-agent` model. See
   [`streaming/docker/README.md`](streaming/docker/README.md).
 - **Sync** transcribes a complete file in a single HTTP request/response (audio
   ≤ 1 h by default). It is self-contained — a single GPU container plus the
@@ -34,21 +33,48 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 [`sync/modal/`](sync/modal/) and
 [`streaming/modal/`](streaming/modal/).
 
-## Repository layout
+## Performance by GPU
 
-```
-.
-├── diarization/
-│   └── docker/  # compose stack (speaker diarization)
-├── examples/
-│   └── sync-diarization/  # sync + diarization with one proxy
-├── streaming/
-│   ├── docker/  # compose stacks (Universal English/Multilingual, Universal-3.6 Pro)
-│   └── modal/   # serverless-GPU packages
-└── sync/
-    ├── docker/  # compose stack (Universal-3.6 Pro)
-    └── modal/   # serverless-GPU package
-```
+Start time and recommended load for the v1.5.0 images on each supported GPU.
+Start time is from container start to ready, and applies to every start.
+
+### Streaming (real-time)
+
+Model `assemblyai-stt-3-7-realtime-agent`.
+
+| GPU | Start time | Recommended concurrent streams |
+|-----|------------|--------------------------------|
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 12 to 14 min | up to 50 |
+| NVIDIA L40S (48 GB) | about 22 min | up to 25 |
+
+The recommended value is the highest stream count where the median latency from
+the end of a spoken turn to its final transcript stayed under 500 ms. It was
+measured with continuous speech on every stream. Real conversations have pauses,
+so most workloads can run more streams than this. The RTX PRO 4500 is not
+supported for streaming in this release.
+
+![Streaming median final latency of assemblyai-stt-3-7-realtime-agent by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
+
+### Sync
+
+Model `universal-3-6-pro`.
+
+| GPU | Start time | Recommended requests per minute | Real-time factor |
+|-----|------------|---------------------------------|------------------|
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to 200 | 200× |
+| NVIDIA L40S (48 GB) | about 12 min | up to 130 | 130× |
+| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to 130 | 130× |
+
+The recommended value is the highest measured rate where a request carrying one
+minute of audio finished in under one second at the median. Shorter audio allows
+a higher rate and longer audio a lower one. The real-time factor is the seconds
+of audio transcribed per second at that rate, which you can use to estimate
+capacity for other audio lengths.
+
+![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per minute, for the RTX PRO 6000, L40S and RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+
+The L40S start times were measured on a 4 vCPU instance, half of what the stacks
+ask for.
 
 ## Prerequisites (all services)
 
@@ -149,6 +175,48 @@ until the first successful validation).
 - **Availability**: run a few containers behind a load balancer.
 
 ## Changelog
+
+### v1.5.0
+
+#### Streaming serves assemblyai-stt-3-7-realtime-agent (2026-11-19)
+
+- **One model.** The streaming stack now serves only
+  `assemblyai-stt-3-7-realtime-agent`, from the new
+  `self-hosted-streaming-asr-stt-3-7-agent:release-v1.5.0` image, with
+  `self-hosted-streaming-api:release-v1.5.0`. Clients connect with
+  `speech_model=assemblyai-stt-3-7-realtime-agent`, which is also the default
+  when `speech_model` is omitted.
+- **Older streaming models discontinued.** The Universal English, Universal
+  Multilingual and Universal-3.6 Pro streaming images are no longer released.
+  `docker-compose.english-multilang.yml`, `docker-compose.universal-3-6-pro.yml`
+  and their Modal apps are removed. Bring the old stack `down`, then bring up
+  `streaming/docker/docker-compose.stt-3-7-realtime-agent.yml` with the image
+  variables from `streaming/docker/.env.example`.
+- **Longer start.** The model warms up on every start, which took about 12 to
+  14 minutes on an RTX PRO 6000 with about 72 GB of GPU memory in use, and
+  about 22 minutes on an L40S with 4 vCPU. The RTX PRO 4500 is not supported for
+  streaming in this release. See [Performance by GPU](#performance-by-gpu). The
+  health check's `start_period` is 3600 s.
+- **Modal.** `streaming/modal/modal_app_stt_3_7_realtime_agent.py` replaces the
+  previous streaming Modal apps. It has not been tested yet.
+- **`streaming-api` health check.** The new `self-hosted-streaming-api` image
+  does not include curl, so the compose health check now calls the image's
+  bundled Python. If you run it under your own orchestrator, use an HTTP probe on
+  `/v3/ws/health` or the same Python command.
+- The license-and-usage-proxy is unchanged; keep your current proxy image.
+
+#### Sync v1.5.0 (2026-11-19)
+
+- Bump `self-hosted-sync-asr-universal-3-6-pro` to `release-v1.5.0`, in
+  `sync/docker/`, `examples/sync-diarization/` and the Modal app (`SYNC_TAG`).
+- **Faster start.** A cold start takes about 7 to 8 minutes on an RTX PRO 6000,
+  down from about 14 minutes with `release-v1.4.0`, with equivalent transcripts.
+
+#### Performance by GPU (2026-11-19)
+
+- New [Performance by GPU](#performance-by-gpu) section with start times,
+  streaming latency and sync requests per minute measured on the RTX PRO 6000,
+  L40S and RTX PRO 4500.
 
 ### v1.2.0
 
