@@ -59,17 +59,17 @@ supported for streaming in this release.
 
 Model `universal-3-6-pro`.
 
-| GPU | Start time | Recommended requests per second |
+| GPU | Start time | Recommended requests per minute |
 |-----|------------|---------------------------------|
-| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to about 3.5 |
-| NVIDIA L40S (48 GB) | about 12 min | up to about 2 |
-| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to about 2 |
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to 200 |
+| NVIDIA L40S (48 GB) | about 12 min | up to 130 |
+| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to 130 |
 
 The recommended value is the highest measured rate where a request carrying one
 minute of audio finished in under one second at the median. Shorter audio allows
 a higher rate and longer audio a lower one.
 
-![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per minute, for the RTX PRO 6000, L40S and RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
 
 The L40S start times were measured on a 4 vCPU instance, half of what the stacks
 ask for.
@@ -231,8 +231,8 @@ until the first successful validation).
 #### Performance by GPU (2026-11-19)
 
 - New [Performance by GPU](#performance-by-gpu) section with start times,
-  streaming latency and sync request rate measured on the RTX PRO 6000, L40S and
-  RTX PRO 4500.
+  streaming latency and sync requests per minute measured on the RTX PRO 6000,
+  L40S and RTX PRO 4500.
 
 ### v1.2.0
 
