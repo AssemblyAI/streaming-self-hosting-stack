@@ -8,7 +8,7 @@ and, within each service, by **model**.
 
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000 or L40S (RTX PRO 4500 not supported in this release) |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000, L40S, or RTX PRO 4500 |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Diarization** | [`diarization/`](diarization/) | Synchronous HTTP, full-file | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
 
@@ -35,7 +35,7 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 
 ## Performance by GPU
 
-Start time and recommended load for the v1.5.0 images on each supported GPU.
+Start time and recommended load for the current images on each supported GPU.
 Start time is from container start to ready, and applies to every start.
 
 ### Streaming (real-time)
@@ -46,14 +46,17 @@ Model `assemblyai-stt-3-7-realtime-agent`.
 |-----|------------|--------------------------------|
 | NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 12 to 14 min | up to 50 |
 | NVIDIA L40S (48 GB) | about 22 min | up to 25 |
+| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 22 min | up to 15 |
 
 The recommended value is the highest stream count where the median latency from
 the end of a spoken turn to its final transcript stayed under 500 ms. It was
 measured with continuous speech on every stream. Real conversations have pauses,
-so most workloads can run more streams than this. The RTX PRO 4500 is not
-supported for streaming in this release.
+so most workloads can run more streams than this. On the RTX PRO 4500 the
+worker accepts at most 32 concurrent streams. A session opened beyond that limit
+is closed with code 3005 a few seconds after it starts, so treat a 3005 right
+after connecting as the stack being at capacity.
 
-![Streaming median final latency of assemblyai-stt-3-7-realtime-agent by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
+![Streaming median final latency of assemblyai-stt-3-7-realtime-agent by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams, the L40S up to 25 streams and the RTX PRO 4500 up to 15 streams.](docs/performance/streaming-latency-by-gpu.svg)
 
 ### Sync
 
@@ -175,6 +178,18 @@ until the first successful validation).
 - **Availability**: run a few containers behind a load balancer.
 
 ## Changelog
+
+### v1.5.1
+
+#### Streaming worker supports the RTX PRO 4500 (2026-11-19)
+
+- Bump `self-hosted-streaming-asr-stt-3-7-agent` to `release-v1.5.1`, in
+  `streaming/docker/.env.example` and the Modal app (`ASR_TAG`). It adds RTX PRO
+  4500 support for streaming. The `release-v1.5.0` worker did not start on that
+  card.
+- On the RTX PRO 4500 we recommend up to 15 concurrent streams, and the worker
+  takes about 22 minutes to start. See [Performance by GPU](#performance-by-gpu).
+- The streaming API, license-and-usage-proxy and sync images are unchanged.
 
 ### v1.5.0
 
