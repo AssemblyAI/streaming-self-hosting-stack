@@ -35,30 +35,44 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 
 ## Performance by GPU
 
-What to expect from the v1.5.0 images on each GPU, measured with the whole stack
-on one GPU machine and the load sent from a separate machine.
+Start time and recommended load for the v1.5.0 images on each supported GPU.
+Start time is from container start to ready, and applies to every start.
 
-| GPU | GPU memory | Tested instance | Streaming start | Sync start | Streams under 500 ms median latency | Highest measured sync rate |
-|-----|------------|-----------------|-----------------|------------|-------------------------------------|----------------------------|
-| NVIDIA RTX PRO 6000 Blackwell | 96 GB | AWS g7e.2xlarge, 8 vCPU | about 12 to 14 min | about 7 to 8 min | 50 | about 5.1 one-minute requests per second (303 s of audio per second) |
-| NVIDIA L40S | 48 GB | AWS g6e.xlarge, 4 vCPU | about 22 min | about 12 min | 25 | about 4.0 one-minute requests per second (239 s of audio per second) |
-| NVIDIA RTX PRO 4500 Blackwell | 32 GB | AWS g7.2xlarge, 8 vCPU | not supported | about 12 min | not supported | about 3.8 one-minute requests per second (225 s of audio per second) |
+### Streaming (real-time)
+
+Model `assemblyai-stt-3-7-realtime-agent`.
+
+| GPU | Start time | Recommended concurrent streams |
+|-----|------------|--------------------------------|
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 12 to 14 min | up to 50 |
+| NVIDIA L40S (48 GB) | about 22 min | up to 25 |
+
+The recommended value is the highest stream count where the median latency from
+the end of a spoken turn to its final transcript stayed under 500 ms. It was
+measured with continuous speech on every stream. Real conversations have pauses,
+so most workloads can run more streams than this. The RTX PRO 4500 is not
+supported for streaming in this release.
 
 ![Streaming median final latency of assemblyai-stt-3-7-realtime-agent by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
 
-![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500. At the highest measured rate it takes about 1.9 s at 5.1 requests per second on the RTX PRO 6000, 3.1 s at 4.0 on the L40S and 3.4 s at 3.8 on the RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+### Sync
 
-In the streaming test every stream sends continuous dense conversational speech
-in real time, streams are added in steps held for 90 seconds each, and latency is
-the median time from the end of a spoken turn to its final transcript. Real
-conversations have pauses, so treat these stream counts as a worst case. Each sync
-request carries one minute of dense speech. The sync rate is the number of these
-requests completed per second while a fixed number of requests, from 1 to 16, were
-kept in flight, with 3 rounds at each step. At about 5.1 requests per second the
-RTX PRO 6000 transcribes 303 seconds of audio per second, about 300 times real
-time. The L40S start times were measured on a 4 vCPU instance, half of what the
-stacks ask for, and have not been measured with 8 vCPU. The RTX PRO 4500 is supported for sync but not for streaming in
-this release.
+Model `universal-3-6-pro`.
+
+| GPU | Start time | Recommended requests per second |
+|-----|------------|---------------------------------|
+| NVIDIA RTX PRO 6000 Blackwell (96 GB) | about 7 to 8 min | up to about 3.5 |
+| NVIDIA L40S (48 GB) | about 12 min | up to about 2 |
+| NVIDIA RTX PRO 4500 Blackwell (32 GB) | about 12 min | up to about 2 |
+
+The recommended value is the highest measured rate where a request carrying one
+minute of audio finished in under one second at the median. Shorter audio allows
+a higher rate and longer audio a lower one.
+
+![Sync median time for universal-3-6-pro to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+
+The L40S start times were measured on a 4 vCPU instance, half of what the stacks
+ask for.
 
 ## Repository layout
 
