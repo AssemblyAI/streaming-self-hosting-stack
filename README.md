@@ -76,24 +76,6 @@ capacity for other audio lengths.
 The L40S start times were measured on a 4 vCPU instance, half of what the stacks
 ask for.
 
-## Repository layout
-
-```
-.
-├── diarization/
-│   └── docker/  # compose stack (speaker diarization)
-├── docs/
-│   └── performance/  # Performance by GPU charts
-├── examples/
-│   └── sync-diarization/  # sync + diarization with one proxy
-├── streaming/
-│   ├── docker/  # compose stack (assemblyai-stt-3-7-realtime-agent)
-│   └── modal/   # serverless-GPU package
-└── sync/
-    ├── docker/  # compose stack (Universal-3.6 Pro)
-    └── modal/   # serverless-GPU package
-```
-
 ## Prerequisites (all services)
 
 1. **AssemblyAI license** valid for the self-hosted product (the `license.jwt` file).
