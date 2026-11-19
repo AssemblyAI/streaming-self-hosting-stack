@@ -8,6 +8,8 @@ any other deployment:
   sync_api       (L40S) -> sync-api, a Modal Server that resolves the proxy's
                            URL at startup
 
+Not yet tested with the v1.5.0 image.
+
 Deploy:  modal deploy modal_app.py
 Tear down: modal app stop aai-sync-u3pro
 

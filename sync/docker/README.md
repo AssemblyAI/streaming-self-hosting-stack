@@ -45,8 +45,8 @@ docker compose -f docker-compose.universal-3-6-pro.yml down
 
 The `sync-api` container is ready once the model is warm. Every start takes about
 7 to 8 minutes on an RTX PRO 6000, about 12 minutes on an RTX PRO 4500, and about
-12 minutes on an L40S with 4 vCPU, while weights load and the engine compiles and warms up. Give the container at least
-8 CPUs. It exposes
+12 minutes on an L40S with 4 vCPU, while weights load and the engine compiles and
+warms up. Give the container at least 8 CPUs. It exposes
 `GET /readyz` (returns `200` once warm, `503` during cold start), which the
 container uses as its Docker healthcheck — point your load balancer's readiness
 probe at it so requests are only routed once the model is warm.
@@ -144,7 +144,7 @@ A Python example is provided in `example/`:
 
 ```bash
 cd example
-python -m venv sync_venv && source sync_venv/bin/activate
+python3 -m venv sync_venv && source sync_venv/bin/activate
 pip install -r requirements.txt
 python transcribe_file.py                    # uses the bundled example_audio_file.wav
 python transcribe_file.py path/to/audio.wav  # or your own 16-bit PCM WAV
@@ -153,7 +153,8 @@ python transcribe_file.py path/to/audio.wav  # or your own 16-bit PCM WAV
 ## Deploying on Modal (serverless GPU)
 
 This stack also runs on Modal's serverless GPUs as a self-contained,
-single-`modal deploy` Modal App. See [`../modal/`](../modal/).
+single-`modal deploy` Modal App. It has not been tested yet with the v1.5.0
+image. See [`../modal/`](../modal/).
 
 ## Production deployment recommendations
 

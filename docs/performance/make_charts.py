@@ -92,11 +92,11 @@ def streaming_chart(gpus, out):
 
 
 def sync_chart(gpus, out):
-    fig, ax = new_axes("Sync: time to transcribe one minute of audio", "Median wall-clock time per request, by number of requests in flight")
+    fig, ax = new_axes("Sync: request time by load", "Each request is one minute of dense speech")
     labels = [g["label"] for g in gpus]
     ends = {}
     for g in gpus:
-        xs = [p["concurrent_requests"] for p in g["sync"]]
+        xs = [p["requests_per_s"] for p in g["sync"]]
         ys = [p["p50_ms"] / 1000 for p in g["sync"]]
         plot_series(ax, xs, ys, g["label"])
         ends[g["label"]] = (xs[-1], ys[-1])
@@ -110,15 +110,12 @@ def sync_chart(gpus, out):
             dy = 6
         placed.append(y)
         end_label(ax, x, y, lab, dy=dy)
-    ax.set_xscale("log", base=2)
-    ax.set_xticks([1, 2, 4, 8, 16])
-    ax.set_xticklabels(["1", "2", "4", "8", "16"])
-    ax.minorticks_off()
-    ax.set_xlim(0.85, 19)
+    ax.set_xlim(0, 6)
+    ax.set_xticks(range(0, 7))
     ax.set_ylim(0, 4)
     ax.set_yticks([0, 1, 2, 3, 4])
     ax.set_yticklabels(["0 s", "1 s", "2 s", "3 s", "4 s"])
-    ax.set_xlabel("Concurrent requests")
+    ax.set_xlabel("One-minute requests completed per second")
     ax.set_ylabel("Median time per request")
     legend(fig, ax, labels)
     fig.savefig(out, facecolor=SURFACE, metadata={"Date": None})

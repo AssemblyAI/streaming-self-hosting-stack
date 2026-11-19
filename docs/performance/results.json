@@ -1,5 +1,5 @@
 {
-  "description": "Measured with the v1.5.0 images. Streaming: median (p50) latency from the end of a spoken turn to its final transcript, every stream sending continuous dense speech in real time. Sync: median wall-clock time to transcribe a one-minute request of dense speech.",
+  "description": "Measured with the v1.5.0 images. Streaming: median (p50) latency from the end of a spoken turn to its final transcript, every stream sending continuous dense speech in real time. Sync: median wall-clock time to transcribe a one-minute request of dense speech, with a fixed number of requests kept in flight (concurrent_requests). audio_s_per_s is seconds of audio transcribed per second at that level, and requests_per_s is audio_s_per_s / 60, the one-minute requests completed per second.",
   "gpus": [
     {
       "name": "NVIDIA RTX PRO 6000 Blackwell",
@@ -40,22 +40,32 @@
       "sync": [
         {
           "concurrent_requests": 1,
+          "audio_s_per_s": 139,
+          "requests_per_s": 2.32,
           "p50_ms": 269
         },
         {
           "concurrent_requests": 2,
+          "audio_s_per_s": 184,
+          "requests_per_s": 3.07,
           "p50_ms": 408.0
         },
         {
           "concurrent_requests": 4,
+          "audio_s_per_s": 207,
+          "requests_per_s": 3.45,
           "p50_ms": 785.0
         },
         {
           "concurrent_requests": 8,
+          "audio_s_per_s": 253,
+          "requests_per_s": 4.22,
           "p50_ms": 1245.5
         },
         {
           "concurrent_requests": 16,
+          "audio_s_per_s": 303,
+          "requests_per_s": 5.05,
           "p50_ms": 1856.5
         }
       ]
@@ -99,22 +109,32 @@
       "sync": [
         {
           "concurrent_requests": 1,
+          "audio_s_per_s": 92,
+          "requests_per_s": 1.53,
           "p50_ms": 500
         },
         {
           "concurrent_requests": 2,
+          "audio_s_per_s": 131,
+          "requests_per_s": 2.18,
           "p50_ms": 683.5
         },
         {
           "concurrent_requests": 4,
+          "audio_s_per_s": 168,
+          "requests_per_s": 2.8,
           "p50_ms": 1128.5
         },
         {
           "concurrent_requests": 8,
+          "audio_s_per_s": 194,
+          "requests_per_s": 3.23,
           "p50_ms": 1908.5
         },
         {
           "concurrent_requests": 16,
+          "audio_s_per_s": 239,
+          "requests_per_s": 3.98,
           "p50_ms": 3087.0
         }
       ]
@@ -129,22 +149,32 @@
       "sync": [
         {
           "concurrent_requests": 1,
+          "audio_s_per_s": 97,
+          "requests_per_s": 1.62,
           "p50_ms": 457
         },
         {
           "concurrent_requests": 2,
+          "audio_s_per_s": 130,
+          "requests_per_s": 2.17,
           "p50_ms": 659.5
         },
         {
           "concurrent_requests": 4,
+          "audio_s_per_s": 146,
+          "requests_per_s": 2.43,
           "p50_ms": 1355.0
         },
         {
           "concurrent_requests": 8,
+          "audio_s_per_s": 173,
+          "requests_per_s": 2.88,
           "p50_ms": 2279.5
         },
         {
           "concurrent_requests": 16,
+          "audio_s_per_s": 225,
+          "requests_per_s": 3.75,
           "p50_ms": 3371.5
         }
       ]

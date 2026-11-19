@@ -91,7 +91,7 @@ cd example
 
 Create and activate a fresh virtual environment:
 ```bash
-python -m venv streaming_venv
+python3 -m venv streaming_venv
 source streaming_venv/bin/activate
 ```
 
@@ -179,7 +179,7 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 ### streaming-asr-stt-3-7-agent service
 
 - **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new ASR container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: Tested on an NVIDIA RTX PRO 6000, where it used up to about 72 GB of GPU memory, and on an NVIDIA L40S, where it used up to about 35 GB. The RTX PRO 4500 is not supported for streaming in this release. See [Performance by GPU](../../README.md#performance-by-gpu) for how many streams each GPU serves. The Docker image is about 40 GB, so allow enough disk for it plus working space.
+- **Hardware Requirements**: Tested on an NVIDIA RTX PRO 6000, where it used about 72 GB of GPU memory after start and up to about 75 GB under load, and on an NVIDIA L40S, where it used up to about 36 GB. The RTX PRO 4500 is not supported for streaming in this release. See [Performance by GPU](../../README.md#performance-by-gpu) for how many streams each GPU serves. The Docker image is about 40 GB, so allow enough disk for it plus working space.
 - **Startup**: The model warms up on every start, which takes about 12 to 14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S with 4 vCPU. The health check allows up to an hour. Start new containers well before you need them, and do not scale this service to zero.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.

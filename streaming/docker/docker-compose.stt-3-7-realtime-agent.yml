@@ -60,7 +60,7 @@ services:
       - USE_STRUCTURED_LOGGING=False
     shm_size: 64m
     healthcheck:
-      # Ready once the model is warm (about 14 minutes on an RTX PRO 6000, on every start).
+      # Ready once the model is warm (about 12 to 14 minutes on an RTX PRO 6000, on every start).
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
       timeout: 2s

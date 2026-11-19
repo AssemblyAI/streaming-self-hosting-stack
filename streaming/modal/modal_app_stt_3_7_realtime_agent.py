@@ -17,6 +17,8 @@ The API dials the ASR over Modal's TLS edge (h2_enabled advertises ALPN h2, so a
 standard gRPC client connects) with AAI_USE_SECURE_CHANNEL_TO_ASR_SERVICE=True,
 replacing compose's private bridge network. See README "Security".
 
+Not yet tested with the v1.5.0 images.
+
 Deploy:  modal deploy modal_app_stt_3_7_realtime_agent.py
 Tear down: modal app stop aai-streaming-stt-3-7-agent
 """
@@ -156,8 +158,8 @@ class LicenseProxy:
     # Called server-side by streaming_api over gRPC, which cannot attach Modal
     # auth headers, so the endpoint is unauthenticated. See README "Security".
     unauthenticated=True,
-    target_concurrency=32,
-    min_containers=1,  # ~14 min warm-up; never scale a realtime backend to zero
+    target_concurrency=25,
+    min_containers=1,  # about 12 to 14 min warm-up on an RTX PRO 6000, longer on an L40S; never scale a realtime backend to zero
     max_containers=4,
     buffer_containers=1,  # scale-up lead time is the warm-up, so keep a warm spare
     scaledown_window=600,

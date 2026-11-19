@@ -8,7 +8,7 @@ and, within each service, by **model**.
 
 | Service | Directory | API | Models | GPU requirement |
 |---------|-----------|-----|--------|-----------------|
-| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000 or L40S |
+| **Streaming** | [`streaming/`](streaming/) | WebSocket, real-time | `assemblyai-stt-3-7-realtime-agent` | NVIDIA RTX PRO 6000 or L40S (RTX PRO 4500 not supported in this release) |
 | **Sync** | [`sync/`](sync/) | Synchronous HTTP, full-file | Universal-3.6 Pro | NVIDIA L40S, RTX PRO 4500, or RTX PRO 6000 (preferred) |
 | **Diarization** | [`diarization/`](diarization/) | Synchronous HTTP, full-file | Speaker diarization | NVIDIA T4 or newer, 16 GB+ VRAM |
 
@@ -38,27 +38,27 @@ stack is a self-contained Modal App deployed with a single `modal deploy` — se
 What to expect from the v1.5.0 images on each GPU, measured with the whole stack
 on one GPU machine and the load sent from a separate machine.
 
-| GPU | GPU memory | Tested instance | Streaming start | Sync start | Streams under 500 ms median latency | Sync throughput at 16 requests |
-|-----|------------|-----------------|-----------------|------------|-------------------------------------|--------------------------------|
-| NVIDIA RTX PRO 6000 Blackwell | 96 GB | AWS g7e.2xlarge, 8 vCPU | about 12 to 14 min | about 7 to 8 min | 50 | 303 s of audio per second |
-| NVIDIA L40S | 48 GB | AWS g6e.xlarge, 4 vCPU | about 22 min | about 12 min | 25 | 239 s of audio per second |
-| NVIDIA RTX PRO 4500 Blackwell | 32 GB | AWS g7.2xlarge, 8 vCPU | not supported | about 12 min | not supported | 225 s of audio per second |
+| GPU | GPU memory | Tested instance | Streaming start | Sync start | Streams under 500 ms median latency | Highest measured sync rate |
+|-----|------------|-----------------|-----------------|------------|-------------------------------------|----------------------------|
+| NVIDIA RTX PRO 6000 Blackwell | 96 GB | AWS g7e.2xlarge, 8 vCPU | about 12 to 14 min | about 7 to 8 min | 50 | about 5.1 one-minute requests per second (303 s of audio per second) |
+| NVIDIA L40S | 48 GB | AWS g6e.xlarge, 4 vCPU | about 22 min | about 12 min | 25 | about 4.0 one-minute requests per second (239 s of audio per second) |
+| NVIDIA RTX PRO 4500 Blackwell | 32 GB | AWS g7.2xlarge, 8 vCPU | not supported | about 12 min | not supported | about 3.8 one-minute requests per second (225 s of audio per second) |
 
 ![Streaming median final latency by number of concurrent streams. The RTX PRO 6000 stays under 500 ms up to 50 streams and the L40S up to 25 streams.](docs/performance/streaming-latency-by-gpu.svg)
 
-![Sync median time to transcribe one minute of audio by number of concurrent requests, for the RTX PRO 6000, L40S and RTX PRO 4500. At 16 requests it takes about 1.9 s on the RTX PRO 6000, 3.1 s on the L40S and 3.4 s on the RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
+![Sync median time to transcribe one minute of audio by the number of one-minute requests completed per second, for the RTX PRO 6000, L40S and RTX PRO 4500. At the highest measured rate it takes about 1.9 s at 5.1 requests per second on the RTX PRO 6000, 3.1 s at 4.0 on the L40S and 3.4 s at 3.8 on the RTX PRO 4500.](docs/performance/sync-latency-by-gpu.svg)
 
 In the streaming test every stream sends continuous dense conversational speech
 in real time, streams are added in steps held for 90 seconds each, and latency is
 the median time from the end of a spoken turn to its final transcript. Real
 conversations have pauses, so treat these stream counts as a worst case. Each sync
-request carries one minute of dense speech, 3 rounds per concurrency level, and
-throughput is seconds of audio transcribed per second (303 is about 300 times real
-time). Start time depends on CPU count as well as the GPU, and the L40S start
-times were measured on 4 vCPU, half of what the stacks ask for, so expect faster
-starts with 8 vCPU. The RTX PRO 4500 is supported for sync but not for streaming in
-this release. The plotted
-numbers and the script that draws the charts are in
+request carries one minute of dense speech. The sync rate is the number of these
+requests completed per second while a fixed number of requests, from 1 to 16, were
+kept in flight, with 3 rounds at each step. At about 5.1 requests per second the
+RTX PRO 6000 transcribes 303 seconds of audio per second, about 300 times real
+time. The L40S start times were measured on a 4 vCPU instance, half of what the
+stacks ask for, and have not been measured with 8 vCPU. The RTX PRO 4500 is supported for sync but not for streaming in
+this release. The plotted numbers and the script that draws the charts are in
 [`docs/performance/`](docs/performance/).
 
 ## Repository layout
@@ -67,6 +67,8 @@ numbers and the script that draws the charts are in
 .
 ├── diarization/
 │   └── docker/  # compose stack (speaker diarization)
+├── docs/
+│   └── performance/  # Performance by GPU data and chart script
 ├── examples/
 │   └── sync-diarization/  # sync + diarization with one proxy
 ├── streaming/
@@ -194,7 +196,7 @@ until the first successful validation).
   `streaming/docker/docker-compose.stt-3-7-realtime-agent.yml` with the image
   variables from `streaming/docker/.env.example`.
 - **Longer start.** The model warms up on every start, which took about 12 to
-  14 minutes on an RTX PRO 6000 with up to about 72 GB of GPU memory in use, and
+  14 minutes on an RTX PRO 6000 with about 72 GB of GPU memory in use, and
   about 22 minutes on an L40S with 4 vCPU. The RTX PRO 4500 is not supported for
   streaming in this release. See [Performance by GPU](#performance-by-gpu). The
   health check's `start_period` is 3600 s.
@@ -216,7 +218,7 @@ until the first successful validation).
 #### Performance by GPU (2026-11-19)
 
 - New [Performance by GPU](#performance-by-gpu) section with start times,
-  streaming latency and sync throughput measured on the RTX PRO 6000, L40S and
+  streaming latency and sync request rate measured on the RTX PRO 6000, L40S and
   RTX PRO 4500.
 
 ### v1.2.0
