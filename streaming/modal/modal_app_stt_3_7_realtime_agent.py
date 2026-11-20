@@ -35,7 +35,7 @@ REGISTRY = "344839248844.dkr.ecr.us-west-2.amazonaws.com"
 # The license-and-usage-proxy is not re-released with v1.5.0, so it keeps its own
 # tag (see the Changelog in the top-level README).
 API_TAG = "release-v1.5.0"
-ASR_TAG = "release-v1.5.0"
+ASR_TAG = "release-v1.5.1"
 PROXY_TAG = "release-v1.2.0"
 ASR_GRPC_PORT = 50051
 

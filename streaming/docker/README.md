@@ -11,9 +11,9 @@ Real-time transcription over a WebSocket connection. Run all commands from this
 
 One stack is shipped. `docker-compose.stt-3-7-realtime-agent.yml` serves the
 `assemblyai-stt-3-7-realtime-agent` model on one GPU. It has been tested on an
-NVIDIA RTX PRO 6000 and an NVIDIA L40S. The RTX PRO 4500 is not supported for
-streaming in this release. See [Performance by GPU](../../README.md#performance-by-gpu)
-for streams, latency and start time on each GPU.
+NVIDIA RTX PRO 6000, an NVIDIA L40S and an NVIDIA RTX PRO 4500. See
+[Performance by GPU](../../README.md#performance-by-gpu) for streams, latency
+and start time on each GPU.
 
 ## Services included
 
@@ -82,7 +82,7 @@ A Python example script is provided to demonstrate how to stream audio to the st
 
 _Note_: You can initiate a session as soon as the `streaming-asr-stt-3-7-agent`
 container is healthy. The model warms up on every start, which takes about 12 to
-14 minutes on an RTX PRO 6000 and longer on an L40S.
+14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S or an RTX PRO 4500.
 
 Change into the `example/` directory:
 ```bash
@@ -179,8 +179,8 @@ for the license-and-usage-proxy. Streaming-specific services follow.
 ### streaming-asr-stt-3-7-agent service
 
 - **Deployment Strategy**: Do gradual rollouts to ensure stability. Both Blue/Green and rolling deployments are good strategies, as the streaming-api can reconnect to a new ASR container if a persistent connection gets disrupted with minimal state loss.
-- **Hardware Requirements**: Tested on an NVIDIA RTX PRO 6000, where it used about 72 GB of GPU memory after start and up to about 75 GB under load, and on an NVIDIA L40S, where it used up to about 36 GB. The RTX PRO 4500 is not supported for streaming in this release. See [Performance by GPU](../../README.md#performance-by-gpu) for how many streams each GPU serves. The Docker image is about 40 GB, so allow enough disk for it plus working space.
-- **Startup**: The model warms up on every start, which takes about 12 to 14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S with 4 vCPU. The health check allows up to an hour. Start new containers well before you need them, and do not scale this service to zero.
+- **Hardware Requirements**: Tested on an NVIDIA RTX PRO 6000, where it used about 72 GB of GPU memory after start and up to about 75 GB under load, on an NVIDIA L40S, where it used up to about 36 GB, and on an NVIDIA RTX PRO 4500, where it used up to about 26 GB during start and about 24 GB under load. On the RTX PRO 4500 the worker accepts at most 32 concurrent streams. A session opened beyond that limit is closed with code 3005 a few seconds after it starts, so treat a 3005 right after connecting as the stack being at capacity. See [Performance by GPU](../../README.md#performance-by-gpu) for how many streams each GPU serves. The Docker image is about 40 GB, so allow enough disk for it plus working space.
+- **Startup**: The model warms up on every start, which takes about 12 to 14 minutes on an RTX PRO 6000 and about 22 minutes on an L40S with 4 vCPU or on an RTX PRO 4500 with 8 vCPU. The health check allows up to an hour. Start new containers well before you need them, and do not scale this service to zero.
 - **Autoscaling**: You can set up autoscaling based on the number of active sessions.
 - **Monitoring**: Always monitor logs during deployment to catch any potential issues early.
 - **Health Checks**: Use the healthcheck command provided in the compose file to monitor container health.

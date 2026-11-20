@@ -9,8 +9,7 @@ with no dependency on any other deployment. Compose equivalents live in
 |---|---|---|
 | `assemblyai-stt-3-7-realtime-agent` | `modal_app_stt_3_7_realtime_agent.py` | `StreamingApi` (CPU), `Asr` (L40S), `LicenseProxy` (CPU) |
 
-This Modal App has not been tested yet with the v1.5.0 images. The RTX PRO 4500
-is not supported for streaming in this release.
+This Modal App has not been tested yet with the current images.
 
 `StreamingApi` resolves its backend and proxy URLs from the same App at startup,
 so there is no manual wiring or two-phase deploy. The stack serves one model
